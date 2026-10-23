@@ -58,7 +58,7 @@ fun LandingScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Live Corridor Network Sync Banner
+        // 1. Sample Corridor Data Banner
         item {
             NetworkSyncBanner(
                 isSyncing = uiState.isNetworkSyncing,

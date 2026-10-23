@@ -387,7 +387,10 @@ class ReturnRouteRepository {
     }
 
     fun switchRole(role: UserRole) {
-        _currentUser.value = _currentUser.value.copy(activeRole = role)
+        val user = _currentUser.value
+        if (role in user.supportedRoles) {
+            _currentUser.value = user.copy(activeRole = role)
+        }
     }
 
     fun addVehicle(vehicle: Vehicle) {

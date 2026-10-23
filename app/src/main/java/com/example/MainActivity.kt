@@ -20,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -60,15 +59,20 @@ fun ReturnRouteApp(
     viewModel: ReturnRouteViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    if (!uiState.isAuthenticated) {
+        LoginScreen(onSignIn = viewModel::signInDemo)
+        return
+    }
     val currentUser by viewModel.currentUser.collectAsState()
+    val isAdmin = currentUser.activeRole == UserRole.ADMIN
+    val isRiderPortal = currentUser.activeRole == UserRole.DRIVER || currentUser.activeRole == UserRole.DELIVERY_PROVIDER
+    val isUserPortal = currentUser.activeRole == UserRole.PASSENGER || currentUser.activeRole == UserRole.PARCEL_SENDER
     val notifications by viewModel.notifications.collectAsState()
     val unreadNotifsCount = notifications.count { !it.isRead }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-
-    var showPersonaSwitcher by remember { mutableStateOf(false) }
 
     // Handle back button: if not on Landing screen, navigate back to Landing
     BackHandler(enabled = uiState.currentScreen != ScreenDestination.LANDING) {
@@ -99,8 +103,7 @@ fun ReturnRouteApp(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { showPersonaSwitcher = true }
-                            .testTag("drawer_persona_card"),
+                            .testTag("drawer_account_card"),
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         border = CardDefaults.outlinedCardBorder()
@@ -135,7 +138,7 @@ fun ReturnRouteApp(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
-                            Icon(Icons.Default.SwapHoriz, contentDescription = "Switch", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.VerifiedUser, contentDescription = "Current account", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                         }
                     }
 
@@ -165,6 +168,7 @@ fun ReturnRouteApp(
                     DrawerNavItem(
                         icon = Icons.Default.DirectionsCar,
                         title = "Passenger Rides",
+                        visible = isUserPortal || isAdmin,
                         selected = uiState.currentScreen == ScreenDestination.RIDES,
                         onClick = {
                             viewModel.navigateTo(ScreenDestination.RIDES)
@@ -174,6 +178,7 @@ fun ReturnRouteApp(
                     DrawerNavItem(
                         icon = Icons.Default.LocalShipping,
                         title = "Parcel Deliveries",
+                        visible = isUserPortal || isAdmin,
                         selected = uiState.currentScreen == ScreenDestination.PARCELS,
                         onClick = {
                             viewModel.navigateTo(ScreenDestination.PARCELS)
@@ -183,6 +188,7 @@ fun ReturnRouteApp(
                     DrawerNavItem(
                         icon = Icons.Default.AltRoute,
                         title = "Driver Journeys",
+                        visible = isRiderPortal || isAdmin,
                         selected = uiState.currentScreen == ScreenDestination.OFFERS,
                         onClick = {
                             viewModel.navigateTo(ScreenDestination.OFFERS)
@@ -192,6 +198,7 @@ fun ReturnRouteApp(
                     DrawerNavItem(
                         icon = Icons.Default.Tune,
                         title = "Route Matching Engine",
+                        visible = isAdmin,
                         selected = uiState.currentScreen == ScreenDestination.MATCHING_ENGINE,
                         badge = "Core",
                         onClick = {
@@ -211,6 +218,7 @@ fun ReturnRouteApp(
                     DrawerNavItem(
                         icon = Icons.Default.TaskAlt,
                         title = "Project Tasks",
+                        visible = isAdmin,
                         badge = "Room DB",
                         selected = uiState.currentScreen == ScreenDestination.TASKS,
                         onClick = {
@@ -221,6 +229,7 @@ fun ReturnRouteApp(
                     DrawerNavItem(
                         icon = Icons.Default.TimeToLeave,
                         title = "Vehicles & Fleet",
+                        visible = isRiderPortal || isAdmin,
                         selected = uiState.currentScreen == ScreenDestination.VEHICLES,
                         onClick = {
                             viewModel.navigateTo(ScreenDestination.VEHICLES)
@@ -230,6 +239,7 @@ fun ReturnRouteApp(
                     DrawerNavItem(
                         icon = Icons.Default.Analytics,
                         title = "Corridor Demand Insights",
+                        visible = isAdmin,
                         selected = uiState.currentScreen == ScreenDestination.DEMAND_INSIGHTS,
                         onClick = {
                             viewModel.navigateTo(ScreenDestination.DEMAND_INSIGHTS)
@@ -239,6 +249,7 @@ fun ReturnRouteApp(
                     DrawerNavItem(
                         icon = Icons.Default.AdminPanelSettings,
                         title = "Admin Dashboard",
+                        visible = isAdmin,
                         selected = uiState.currentScreen == ScreenDestination.ADMIN,
                         onClick = {
                             viewModel.navigateTo(ScreenDestination.ADMIN)
@@ -309,12 +320,12 @@ fun ReturnRouteApp(
                             )
                         }
 
-                        // Persona role pill
+                        // Demo account sign-out control
                         Surface(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable { showPersonaSwitcher = true }
-                                .testTag("persona_switcher_badge"),
+                                .clickable { viewModel.signOutDemo() }
+                                .testTag("sign_out_button"),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                             border = CardDefaults.outlinedCardBorder()
                         ) {
@@ -330,12 +341,12 @@ fun ReturnRouteApp(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = currentUser.name.substringBefore(" "),
+                                    text = "Sign out",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Spacer(modifier = Modifier.width(2.dp))
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Logout, contentDescription = "Sign out", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
                             }
                         }
 
@@ -348,18 +359,6 @@ fun ReturnRouteApp(
                                 imageVector = Icons.Default.Map,
                                 contentDescription = "India Map",
                                 tint = if (uiState.currentScreen == ScreenDestination.INDIA_MAP) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        // Theme Toggle (Light / Dark)
-                        IconButton(
-                            onClick = { viewModel.toggleTheme() },
-                            modifier = Modifier.testTag("theme_toggle_button")
-                        ) {
-                            Icon(
-                                imageVector = if (uiState.isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                contentDescription = "Toggle Theme",
-                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
 
@@ -412,6 +411,7 @@ fun ReturnRouteApp(
                         ),
                         modifier = Modifier.testTag("nav_home")
                     )
+                    if (isUserPortal) {
                     NavigationBarItem(
                         selected = uiState.currentScreen == ScreenDestination.RIDES,
                         onClick = { viewModel.navigateTo(ScreenDestination.RIDES) },
@@ -436,6 +436,8 @@ fun ReturnRouteApp(
                         ),
                         modifier = Modifier.testTag("nav_parcels")
                     )
+                    }
+                    if (isRiderPortal) {
                     NavigationBarItem(
                         selected = uiState.currentScreen == ScreenDestination.OFFERS,
                         onClick = { viewModel.navigateTo(ScreenDestination.OFFERS) },
@@ -448,6 +450,7 @@ fun ReturnRouteApp(
                         ),
                         modifier = Modifier.testTag("nav_offers")
                     )
+                    }
                     NavigationBarItem(
                         selected = uiState.currentScreen == ScreenDestination.BOOKINGS,
                         onClick = { viewModel.navigateTo(ScreenDestination.BOOKINGS) },
@@ -488,23 +491,6 @@ fun ReturnRouteApp(
         }
     }
 
-    // Persona Switcher Dialog
-    if (showPersonaSwitcher) {
-        PersonaSwitcherDialog(
-            currentUser = currentUser,
-            allUsers = viewModel.repository.sampleUsers,
-            onSelectUser = { userId ->
-                viewModel.switchUser(userId)
-                showPersonaSwitcher = false
-            },
-            onSelectRole = { role ->
-                viewModel.switchRole(role)
-                showPersonaSwitcher = false
-            },
-            onDismiss = { showPersonaSwitcher = false }
-        )
-    }
-
     // Booking Confirmation Request Modal
     if (uiState.showBookingDialog && uiState.selectedMatchCandidate != null) {
         BookingConfirmationDialog(
@@ -523,8 +509,10 @@ fun DrawerNavItem(
     title: String,
     selected: Boolean,
     badge: String? = null,
+    visible: Boolean = true,
     onClick: () -> Unit
 ) {
+    if (!visible) return
     NavigationDrawerItem(
         icon = { Icon(icon, contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
         label = {
@@ -561,72 +549,6 @@ fun DrawerNavItem(
         ),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.padding(vertical = 2.dp)
-    )
-}
-
-@Composable
-fun PersonaSwitcherDialog(
-    currentUser: com.example.data.model.UserProfile,
-    allUsers: List<com.example.data.model.UserProfile>,
-    onSelectUser: (String) -> Unit,
-    onSelectRole: (UserRole) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("Switch User Persona & Role", fontWeight = FontWeight.Bold)
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Experience ReturnRoute across all verified platform roles:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-
-                allUsers.forEach { user ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onSelectUser(user.id) },
-                        color = if (user.id == currentUser.id) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant,
-                        border = CardDefaults.outlinedCardBorder().copy(
-                            brush = SolidColor(if (user.id == currentUser.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(user.avatarInitials, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(user.name, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
-                                Text("${user.activeRole.label} • ★ ${user.rating} (${user.completedTrips} trips)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            if (user.id == currentUser.id) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Done") }
-        }
     )
 }
 

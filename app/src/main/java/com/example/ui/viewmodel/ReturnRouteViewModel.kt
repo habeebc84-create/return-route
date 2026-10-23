@@ -41,6 +41,7 @@ enum class SortOption(val label: String) {
 
 data class UiState(
     val currentScreen: ScreenDestination = ScreenDestination.LANDING,
+    val isAuthenticated: Boolean = false,
     val isDarkMode: Boolean = false, // Clean modern booking app light mode by default, toggleable anytime
     val isNetworkSyncing: Boolean = false,
     val lastSyncTime: Long = System.currentTimeMillis(),
@@ -64,7 +65,7 @@ data class UiState(
     val snackbarMessage: String? = null
 )
 
-class ReturnRouteViewModel @JvmOverloads constructor(
+class ReturnRouteViewModel constructor(
     application: Application,
     val repository: ReturnRouteRepository = ReturnRouteRepository(),
     customTaskRepository: TaskRepository? = null
@@ -87,13 +88,27 @@ class ReturnRouteViewModel @JvmOverloads constructor(
 
     val currentUser = repository.currentUser
     val journeyOffers = repository.journeyOffers
-    val rideRequests = repository.rideRequests
-    val parcelRequests = repository.parcelRequests
-    val bookings = repository.bookings
-    val notifications = repository.notifications
-    val vehicles = repository.vehicles
-    val reviews = repository.reviews
-    val issueReports = repository.issueReports
+    val rideRequests = combine(repository.rideRequests, currentUser) { items, user ->
+        items.filter { it.passengerId == user.id }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val parcelRequests = combine(repository.parcelRequests, currentUser) { items, user ->
+        items.filter { it.senderId == user.id }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val bookings = combine(repository.bookings, currentUser) { items, user ->
+        items.filter { it.bookerId == user.id || it.driverId == user.id }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val notifications = combine(repository.notifications, currentUser) { items, user ->
+        items.filter { user.activeRole == UserRole.ADMIN || it.userId == user.id }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val vehicles = combine(repository.vehicles, currentUser) { items, user ->
+        if (user.activeRole == UserRole.ADMIN) items else items.filter { it.driverId == user.id }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val reviews = combine(repository.reviews, currentUser) { items, user ->
+        items.filter { it.reviewerId == user.id || it.revieweeId == user.id || user.activeRole == UserRole.ADMIN }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val issueReports = combine(repository.issueReports, currentUser) { items, user ->
+        if (user.activeRole == UserRole.ADMIN) items else items.filter { it.reporterId == user.id }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val demandForecasts = DemandPredictionEngine.getForecasts()
 
     init {
@@ -101,7 +116,65 @@ class ReturnRouteViewModel @JvmOverloads constructor(
     }
 
     fun navigateTo(screen: ScreenDestination) {
+        if (!canAccess(screen, currentUser.value.activeRole)) {
+            showSnackbar("That section is not available for this demo account.")
+            return
+        }
         _uiState.update { it.copy(currentScreen = screen) }
+    }
+
+    fun signInDemo(role: UserRole) {
+        val userId = when (role) {
+            UserRole.ADMIN -> "user_priya"
+            UserRole.DRIVER, UserRole.DELIVERY_PROVIDER -> "user_rajesh"
+            UserRole.PARCEL_SENDER -> "user_rohan"
+            UserRole.PASSENGER -> "user_ananya"
+        }
+        repository.switchUser(userId)
+        repository.switchRole(role)
+        val landing = when (role) {
+            UserRole.ADMIN -> ScreenDestination.ADMIN
+            UserRole.DRIVER, UserRole.DELIVERY_PROVIDER -> ScreenDestination.OFFERS
+            else -> ScreenDestination.LANDING
+        }
+        _uiState.update { it.copy(isAuthenticated = true, currentScreen = landing) }
+        refreshMatches()
+    }
+
+    fun signOutDemo() {
+        _uiState.update {
+            it.copy(
+                isAuthenticated = false,
+                currentScreen = ScreenDestination.LANDING,
+                showBookingDialog = false,
+                showCreateRideDialog = false,
+                showCreateParcelDialog = false,
+                showCreateOfferDialog = false,
+                showCreateVehicleDialog = false,
+                showReviewDialog = false,
+                showReportDialog = false,
+                selectedBookingForReview = null,
+                selectedMatchCandidate = null
+            )
+        }
+    }
+
+    private fun canAccess(screen: ScreenDestination, role: UserRole): Boolean {
+        if (role == UserRole.ADMIN) return true
+        val common = setOf(
+            ScreenDestination.LANDING,
+            ScreenDestination.INDIA_MAP,
+            ScreenDestination.BOOKINGS,
+            ScreenDestination.NOTIFICATIONS,
+            ScreenDestination.SAFETY_LEGAL
+        )
+        val userScreens = common + setOf(ScreenDestination.RIDES, ScreenDestination.PARCELS)
+        val riderScreens = common + setOf(ScreenDestination.OFFERS, ScreenDestination.VEHICLES)
+        return when (role) {
+            UserRole.PASSENGER, UserRole.PARCEL_SENDER -> screen in userScreens
+            UserRole.DRIVER, UserRole.DELIVERY_PROVIDER -> screen in riderScreens
+            UserRole.ADMIN -> true
+        }
     }
 
     fun toggleTheme() {
@@ -192,8 +265,9 @@ class ReturnRouteViewModel @JvmOverloads constructor(
 
     fun refreshMatches() {
         viewModelScope.launch {
-            val firstRide = repository.rideRequests.value.firstOrNull()
-            val firstParcel = repository.parcelRequests.value.firstOrNull()
+            val userId = currentUser.value.id
+            val firstRide = repository.rideRequests.value.firstOrNull { it.passengerId == userId }
+            val firstParcel = repository.parcelRequests.value.firstOrNull { it.senderId == userId }
 
             val rideCandidates = if (firstRide != null) {
                 repository.journeyOffers.value.map { offer ->
