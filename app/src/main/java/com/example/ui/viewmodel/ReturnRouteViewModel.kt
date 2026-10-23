@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -10,6 +11,9 @@ import com.example.data.local.task.TaskEntity
 import com.example.data.local.task.TaskRepository
 import com.example.data.model.*
 import com.example.data.repository.ReturnRouteRepository
+import com.example.auth.AuthenticatedAccount
+import com.example.auth.FirebaseGoogleAuthManager
+import com.example.BuildConfig
 import com.example.engine.DemandPredictionEngine
 import com.example.engine.PricingEngine
 import com.example.engine.RouteMatchingEngine
@@ -42,6 +46,8 @@ enum class SortOption(val label: String) {
 data class UiState(
     val currentScreen: ScreenDestination = ScreenDestination.LANDING,
     val isAuthenticated: Boolean = false,
+    val isSigningIn: Boolean = false,
+    val authErrorMessage: String? = null,
     val isDarkMode: Boolean = false, // Clean modern booking app light mode by default, toggleable anytime
     val isNetworkSyncing: Boolean = false,
     val lastSyncTime: Long = System.currentTimeMillis(),
@@ -85,6 +91,7 @@ class ReturnRouteViewModel constructor(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+    private val googleAuthManager by lazy { FirebaseGoogleAuthManager(application) }
 
     val currentUser = repository.currentUser
     val journeyOffers = repository.journeyOffers
@@ -113,50 +120,132 @@ class ReturnRouteViewModel constructor(
 
     init {
         refreshMatches()
+        restoreFirebaseSession()
     }
 
     fun navigateTo(screen: ScreenDestination) {
         if (!canAccess(screen, currentUser.value.activeRole)) {
-            showSnackbar("That section is not available for this demo account.")
+            showSnackbar("That section is not available for your account role.")
             return
         }
         _uiState.update { it.copy(currentScreen = screen) }
     }
 
-    fun signInDemo(role: UserRole) {
-        val userId = when (role) {
-            UserRole.ADMIN -> "user_priya"
-            UserRole.DRIVER, UserRole.DELIVERY_PROVIDER -> "user_rajesh"
-            UserRole.PARCEL_SENDER -> "user_rohan"
-            UserRole.PASSENGER -> "user_ananya"
+    fun signInWithGoogle(activityContext: Context) {
+        if (_uiState.value.isSigningIn) return
+        _uiState.update { it.copy(isSigningIn = true, authErrorMessage = null) }
+        viewModelScope.launch {
+            try {
+                completeFirebaseSignIn(googleAuthManager.signIn(activityContext))
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        authErrorMessage = error.localizedMessage ?: "Google sign-in failed. Please try again."
+                    )
+                }
+            }
         }
-        repository.switchUser(userId)
-        repository.switchRole(role)
-        val landing = when (role) {
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            try {
+                googleAuthManager.signOut()
+            } catch (_: Exception) {
+                // Always close the local session even if provider cleanup fails.
+            }
+            _uiState.update {
+                it.copy(
+                    isAuthenticated = false,
+                    isSigningIn = false,
+                    authErrorMessage = null,
+                    currentScreen = ScreenDestination.LANDING,
+                    showBookingDialog = false,
+                    showCreateRideDialog = false,
+                    showCreateParcelDialog = false,
+                    showCreateOfferDialog = false,
+                    showCreateVehicleDialog = false,
+                    showReviewDialog = false,
+                    showReportDialog = false,
+                    selectedBookingForReview = null,
+                    selectedMatchCandidate = null
+                )
+            }
+        }
+    }
+
+    private fun restoreFirebaseSession() {
+        viewModelScope.launch {
+            try {
+                googleAuthManager.restoreSignedInAccount()?.let(::completeFirebaseSignIn)
+            } catch (_: Exception) {
+                // Leave the login screen available if Firebase is not configured yet.
+            }
+        }
+    }
+
+    private fun completeFirebaseSignIn(account: AuthenticatedAccount) {
+        if (!roleBelongsToInstalledApp(account.role)) {
+            viewModelScope.launch {
+                try {
+                    googleAuthManager.signOut()
+                } catch (_: Exception) {
+                    // The role mismatch still blocks this local app session.
+                }
+            }
+            _uiState.update {
+                it.copy(
+                    isAuthenticated = false,
+                    isSigningIn = false,
+                    authErrorMessage = "This account is not assigned to the ${BuildConfig.APP_ROLE} app. Ask an administrator to assign the correct role."
+                )
+            }
+            return
+        }
+        val initials = account.displayName
+            .trim()
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+            .joinToString("")
+            .ifBlank { "U" }
+        val profile = UserProfile(
+            id = account.uid,
+            name = account.displayName,
+            email = account.email,
+            avatarInitials = initials,
+            activeRole = account.role,
+            supportedRoles = listOf(account.role),
+            rating = 0.0,
+            completedTrips = 0,
+            verifiedIdentity = account.emailVerified
+        )
+        repository.setAuthenticatedUser(profile)
+        val initialScreen = when (account.role) {
             UserRole.ADMIN -> ScreenDestination.ADMIN
             UserRole.DRIVER, UserRole.DELIVERY_PROVIDER -> ScreenDestination.OFFERS
             else -> ScreenDestination.LANDING
         }
-        _uiState.update { it.copy(isAuthenticated = true, currentScreen = landing) }
+        _uiState.update {
+            it.copy(
+                isAuthenticated = true,
+                isSigningIn = false,
+                authErrorMessage = null,
+                currentScreen = initialScreen
+            )
+        }
         refreshMatches()
     }
 
-    fun signOutDemo() {
-        _uiState.update {
-            it.copy(
-                isAuthenticated = false,
-                currentScreen = ScreenDestination.LANDING,
-                showBookingDialog = false,
-                showCreateRideDialog = false,
-                showCreateParcelDialog = false,
-                showCreateOfferDialog = false,
-                showCreateVehicleDialog = false,
-                showReviewDialog = false,
-                showReportDialog = false,
-                selectedBookingForReview = null,
-                selectedMatchCandidate = null
-            )
-        }
+    private fun roleBelongsToInstalledApp(role: UserRole): Boolean = when (BuildConfig.APP_ROLE) {
+        "passenger" -> role == UserRole.PASSENGER || role == UserRole.PARCEL_SENDER
+        "rider" -> role == UserRole.DRIVER || role == UserRole.DELIVERY_PROVIDER
+        "admin" -> role == UserRole.ADMIN
+        else -> false
     }
 
     private fun canAccess(screen: ScreenDestination, role: UserRole): Boolean {
@@ -301,17 +390,6 @@ class ReturnRouteViewModel constructor(
     fun updateBookingStatus(bookingId: String, newStatus: BookingStatus) {
         repository.updateBookingStatus(bookingId, newStatus)
         showSnackbar("Booking updated to ${newStatus.label}")
-    }
-
-    fun switchUser(userId: String) {
-        repository.switchUser(userId)
-        showSnackbar("Switched user to ${repository.currentUser.value.name}")
-        refreshMatches()
-    }
-
-    fun switchRole(role: UserRole) {
-        repository.switchRole(role)
-        showSnackbar("Switched active persona to ${role.label}")
     }
 
     fun postRideRequest(

@@ -381,16 +381,8 @@ class ReturnRouteRepository {
     )
     val issueReports: StateFlow<List<IssueReport>> = _issueReports.asStateFlow()
 
-    fun switchUser(userId: String) {
-        val user = sampleUsers.find { it.id == userId } ?: return
+    fun setAuthenticatedUser(user: UserProfile) {
         _currentUser.value = user
-    }
-
-    fun switchRole(role: UserRole) {
-        val user = _currentUser.value
-        if (role in user.supportedRoles) {
-            _currentUser.value = user.copy(activeRole = role)
-        }
     }
 
     fun addVehicle(vehicle: Vehicle) {

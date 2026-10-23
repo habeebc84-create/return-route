@@ -22,6 +22,25 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  flavorDimensions += "role"
+  productFlavors {
+    create("passenger") {
+      dimension = "role"
+      applicationId = "com.aistudio.returnroute.rtapp"
+      buildConfigField("String", "APP_ROLE", "\"passenger\"")
+    }
+    create("rider") {
+      dimension = "role"
+      applicationId = "com.aistudio.returnroute.rider"
+      buildConfigField("String", "APP_ROLE", "\"rider\"")
+    }
+    create("admin") {
+      dimension = "role"
+      applicationId = "com.aistudio.returnroute.admin"
+      buildConfigField("String", "APP_ROLE", "\"admin\"")
+    }
+  }
+
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
   // and updating Android apps in AI Studio.
   signingConfigs {
@@ -99,5 +118,9 @@ dependencies {
   implementation(libs.androidx.room.runtime)
   ksp(libs.androidx.room.compiler)
   implementation(libs.converter.moshi)
+  implementation(libs.firebase.auth)
   implementation(libs.firebase.ai)
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services.auth)
+  implementation(libs.googleid)
 }

@@ -60,7 +60,11 @@ fun ReturnRouteApp(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     if (!uiState.isAuthenticated) {
-        LoginScreen(onSignIn = viewModel::signInDemo)
+        LoginScreen(
+            onSignIn = viewModel::signInWithGoogle,
+            isLoading = uiState.isSigningIn,
+            errorMessage = uiState.authErrorMessage
+        )
         return
     }
     val currentUser by viewModel.currentUser.collectAsState()
@@ -324,7 +328,7 @@ fun ReturnRouteApp(
                         Surface(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable { viewModel.signOutDemo() }
+                                .clickable { viewModel.signOut() }
                                 .testTag("sign_out_button"),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                             border = CardDefaults.outlinedCardBorder()
