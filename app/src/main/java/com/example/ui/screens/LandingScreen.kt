@@ -334,7 +334,7 @@ fun LandingScreen(
                                 color = StatusGreenPill
                             ) {
                                 Text(
-                                    text = "Live",
+                                    text = "Sample",
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                                     color = StatusGreenText,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)

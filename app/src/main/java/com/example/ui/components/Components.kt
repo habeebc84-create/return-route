@@ -83,12 +83,12 @@ fun NetworkSyncBanner(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = if (isSyncing) "Syncing with Live Mobility Network..." else "🌐 Live Corridor Network Online",
+                        text = if (isSyncing) "Loading sample corridors..." else "Bundled Sample Corridor Data",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        text = if (isSyncing) "Fetching live return trips..." else "Last updated $timeFormatted • Real-time corridors",
+                        text = if (isSyncing) "Preparing demo routes..." else "Sample data refreshed $timeFormatted",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
@@ -113,7 +113,7 @@ fun NetworkSyncBanner(
                 } else {
                     Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Fetch Live", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Load Samples", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -277,6 +277,7 @@ fun MatchScoreCard(
 
                 Button(
                     onClick = onBookClick,
+                    enabled = candidate.isEligible,
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.testTag("book_candidate_button_${candidate.id}")
                 ) {
@@ -286,7 +287,13 @@ fun MatchScoreCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(if (candidate.matchType == MatchType.PASSENGER_RIDE) "Book Seat" else "Book Parcel")
+                    Text(
+                        when {
+                            !candidate.isEligible -> "Not Eligible"
+                            candidate.matchType == MatchType.PASSENGER_RIDE -> "Book Seat"
+                            else -> "Book Parcel"
+                        }
+                    )
                 }
             }
         }

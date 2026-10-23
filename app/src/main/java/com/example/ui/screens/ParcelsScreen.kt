@@ -110,10 +110,10 @@ fun ParcelsScreen(
                             Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(10.dp))
                             Text("No parcel matches currently available", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                            Text("Fetch live corridors to load new verified couriers.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Load bundled sample corridors to see demo courier routes.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(onClick = { viewModel.fetchLiveNetworkCorridors() }) {
-                                Text("Fetch Live Couriers from Internet")
+                                Text("Load Sample Couriers")
                             }
                         }
                     }

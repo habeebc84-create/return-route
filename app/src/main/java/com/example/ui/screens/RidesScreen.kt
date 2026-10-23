@@ -155,10 +155,10 @@ fun RidesScreen(
                             Icon(Icons.Default.SearchOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(10.dp))
                             Text("No matching rides found", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                            Text("Try adjusting your search or fetch live corridors from the internet.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Try adjusting your search or load the bundled sample corridors.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(onClick = { viewModel.fetchLiveNetworkCorridors() }) {
-                                Text("Fetch Live Corridors from Internet")
+                                Text("Load Sample Corridors")
                             }
                         }
                     }

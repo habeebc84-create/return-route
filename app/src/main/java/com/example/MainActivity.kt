@@ -291,7 +291,7 @@ fun ReturnRouteApp(
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.CloudDownload,
-                                    contentDescription = "Fetch Live Corridors from Internet",
+                                    contentDescription = "Load Sample Corridors",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }

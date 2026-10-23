@@ -666,8 +666,8 @@ class ReturnRouteRepository {
 
         addNotification(
             userId = _currentUser.value.id,
-            title = "🇮🇳 Live India Corridors Synced",
-            message = "Retrieved live return routes across Delhi-NCR, Maharashtra, Karnataka, Tamil Nadu, and Gujarat. ${newOffers.size} new corridor trips added!",
+            title = "🇮🇳 Sample India Corridors Loaded",
+            message = "Loaded bundled sample return routes across India. ${newOffers.size} sample corridor trips added.",
             type = NotificationType.SYSTEM
         )
 

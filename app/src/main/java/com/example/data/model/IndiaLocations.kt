@@ -2,6 +2,26 @@ package com.example.data.model
 
 object IndiaLocations {
 
+    /** Resolve a user-entered city or picker label to a real catalog coordinate. */
+    fun resolve(query: String): GeoLocation? {
+        val cleaned = query.trim().lowercase()
+            .replace("bkc", "bandra kurla complex")
+            .replace("omr", "omr")
+        if (cleaned.isBlank()) return null
+        fun normalize(value: String) = value.lowercase().filter { it.isLetterOrDigit() }
+        val target = normalize(cleaned)
+        return ALL_LOCATIONS.firstOrNull { location ->
+            val name = normalize(location.name)
+            val address = normalize(location.address)
+            val city = normalize(location.city)
+            target == name || target == address || target == city ||
+                name.startsWith(target) || target.startsWith(name) || target.contains(name) ||
+                (target.contains(city) && (name.contains(target.removePrefix(city)) || address.contains(target.removePrefix(city))))
+        } ?: ALL_LOCATIONS.firstOrNull { location ->
+            normalize(location.city) == target
+        }
+    }
+
     val ALL_LOCATIONS: List<GeoLocation> = listOf(
         // --- NORTH INDIA ---
         GeoLocation("New Delhi (Connaught Place)", "Central Delhi, Rajiv Chowk", 28.6315, 77.2167, "New Delhi", "Delhi NCR"),

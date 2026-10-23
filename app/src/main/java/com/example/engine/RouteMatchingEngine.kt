@@ -55,15 +55,24 @@ object RouteMatchingEngine {
         aLat: Double, aLon: Double,
         bLat: Double, bLon: Double
     ): Double {
-        val distA = calculateHaversineDistanceKm(pLat, pLon, aLat, aLon)
-        val distB = calculateHaversineDistanceKm(pLat, pLon, bLat, bLon)
-        val segmentLen = calculateHaversineDistanceKm(aLat, aLon, bLat, bLon)
-
-        if (segmentLen < 0.1) return distA
-
-        val crossDist = (distA + distB) - segmentLen
-        val perpEstimate = sqrt(max(0.0, distA.pow(2) - (segmentLen / 2).pow(2)))
-        return min(min(distA, distB), max(crossDist * 1.5, perpEstimate.coerceAtMost(min(distA, distB))))
+        // Project the short route segment to a local tangent plane, then clamp the
+        // nearest-point projection to the segment endpoints. This avoids the old
+        // midpoint-based approximation, which badly distorted off-center points.
+        val referenceLat = Math.toRadians((pLat + aLat + bLat) / 3.0)
+        fun x(lon: Double) = Math.toRadians(lon) * cos(referenceLat) * EARTH_RADIUS_KM
+        fun y(lat: Double) = Math.toRadians(lat) * EARTH_RADIUS_KM
+        val px = x(pLon)
+        val py = y(pLat)
+        val ax = x(aLon)
+        val ay = y(aLat)
+        val dx = x(bLon) - ax
+        val dy = y(bLat) - ay
+        val lengthSquared = dx * dx + dy * dy
+        if (lengthSquared < 1e-8) return calculateHaversineDistanceKm(pLat, pLon, aLat, aLon)
+        val projection = (((px - ax) * dx + (py - ay) * dy) / lengthSquared).coerceIn(0.0, 1.0)
+        val nearestX = ax + projection * dx
+        val nearestY = ay + projection * dy
+        return kotlin.math.hypot(px - nearestX, py - nearestY)
     }
 
     /**
@@ -103,7 +112,7 @@ object RouteMatchingEngine {
         )
 
         if (priceBreakdown.finalTotalUsd > request.maxBudgetUsd) {
-            rejectionReasons.add("Estimated price ($${priceBreakdown.finalTotalUsd}) exceeds passenger budget ($${request.maxBudgetUsd}).")
+            rejectionReasons.add("Estimated price (₹${priceBreakdown.finalTotalUsd}) exceeds passenger budget (₹${request.maxBudgetUsd}).")
         }
 
         var score = 100
@@ -183,7 +192,7 @@ object RouteMatchingEngine {
         )
 
         if (priceBreakdown.finalTotalUsd > request.maxBudgetUsd) {
-            rejectionReasons.add("Delivery cost ($${priceBreakdown.finalTotalUsd}) exceeds sender budget ($${request.maxBudgetUsd}).")
+            rejectionReasons.add("Delivery cost (₹${priceBreakdown.finalTotalUsd}) exceeds sender budget (₹${request.maxBudgetUsd}).")
         }
 
         var score = 95

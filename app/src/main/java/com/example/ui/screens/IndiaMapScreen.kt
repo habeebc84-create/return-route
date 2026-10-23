@@ -90,7 +90,7 @@ fun IndiaMapScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Live corridors across 28 states & 80+ cities",
+                            text = "Sample corridors across 28 states & 80+ cities",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

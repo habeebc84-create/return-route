@@ -172,7 +172,7 @@ class ReturnRouteViewModel @JvmOverloads constructor(
     fun fetchLiveNetworkCorridors() {
         viewModelScope.launch {
             _uiState.update { it.copy(isNetworkSyncing = true) }
-            showSnackbar("🌐 Connecting to live nationwide corridors via internet...")
+            showSnackbar("Loading bundled sample corridors...")
             val result = repository.fetchLiveCorridorsFromNetwork()
             result.onSuccess { count ->
                 _uiState.update {
@@ -182,10 +182,10 @@ class ReturnRouteViewModel @JvmOverloads constructor(
                     )
                 }
                 refreshMatches()
-                showSnackbar("✅ Fetched live data: $count new return route corridors from internet!")
+                showSnackbar("Loaded $count sample return-route corridors.")
             }.onFailure {
                 _uiState.update { it.copy(isNetworkSyncing = false) }
-                showSnackbar("Network sync completed with cached routes.")
+                showSnackbar("Sample corridors could not be loaded. Please try again.")
             }
         }
     }
@@ -248,12 +248,18 @@ class ReturnRouteViewModel @JvmOverloads constructor(
         notes: String,
         isReturnTrip: Boolean
     ) {
+        val origin = IndiaLocations.resolve(originName)
+        val destination = IndiaLocations.resolve(destName)
+        if (origin == null || destination == null) {
+            showSnackbar("Choose valid Indian pickup and destination locations.")
+            return
+        }
         val newReq = RideRequest(
             passengerId = currentUser.value.id,
             passengerName = currentUser.value.name,
             passengerRating = currentUser.value.rating,
-            origin = GeoLocation(originName, originName, 47.6062, -122.3321, originName.substringBefore(","), "WA"),
-            destination = GeoLocation(destName, destName, 45.5152, -122.6784, destName.substringBefore(","), "OR"),
+            origin = origin,
+            destination = destination,
             preferredDate = "Tomorrow",
             earliestDepartureTime = "08:00 AM",
             latestDepartureTime = "06:00 PM",
@@ -277,11 +283,17 @@ class ReturnRouteViewModel @JvmOverloads constructor(
         budget: Double,
         handling: String
     ) {
+        val pickup = IndiaLocations.resolve(pickupName)
+        val destination = IndiaLocations.resolve(destName)
+        if (pickup == null || destination == null) {
+            showSnackbar("Choose valid Indian pickup and destination locations.")
+            return
+        }
         val newReq = ParcelRequest(
             senderId = currentUser.value.id,
             senderName = currentUser.value.name,
-            pickup = GeoLocation(pickupName, pickupName, 47.6062, -122.3321, pickupName.substringBefore(","), "WA"),
-            destination = GeoLocation(destName, destName, 45.5152, -122.6784, destName.substringBefore(","), "OR"),
+            pickup = pickup,
+            destination = destination,
             category = category,
             weightKg = weightKg,
             preferredDate = "Tomorrow",
@@ -307,6 +319,12 @@ class ReturnRouteViewModel @JvmOverloads constructor(
         isReturnTrip: Boolean,
         savingsPercent: Int
     ) {
+        val origin = IndiaLocations.resolve(originName)
+        val destination = IndiaLocations.resolve(destName)
+        if (origin == null || destination == null) {
+            showSnackbar("Choose valid Indian origin and destination locations.")
+            return
+        }
         val vehicle = repository.vehicles.value.firstOrNull()
         val offer = JourneyOffer(
             driverId = currentUser.value.id,
@@ -314,8 +332,8 @@ class ReturnRouteViewModel @JvmOverloads constructor(
             driverRating = currentUser.value.rating,
             vehicleId = vehicle?.id ?: "veh_tesla_y",
             vehicleDescription = vehicle?.let { "${it.make} ${it.model}" } ?: "Tesla Model Y",
-            origin = GeoLocation(originName, originName, 47.6062, -122.3321, originName.substringBefore(","), "WA"),
-            destination = GeoLocation(destName, destName, 45.5152, -122.6784, destName.substringBefore(","), "OR"),
+            origin = origin,
+            destination = destination,
             departureTime = departureTime,
             estimatedArrivalTime = "Scheduled",
             totalDistanceKm = 280.0,
