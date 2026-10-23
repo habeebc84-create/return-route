@@ -1,0 +1,6 @@
+{
+  "name": "ReturnRoute",
+  "description": "Smart mobility, passenger rides, parcel delivery, geospatial route optimization, and trip matching.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
