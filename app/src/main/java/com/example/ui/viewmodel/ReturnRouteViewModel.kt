@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.app.Activity
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
@@ -14,6 +15,7 @@ import com.example.data.repository.ReturnRouteRepository
 import com.example.auth.AuthenticatedAccount
 import com.example.auth.FirebaseGoogleAuthManager
 import com.example.BuildConfig
+import com.google.firebase.auth.PhoneAuthCredential
 import com.example.engine.DemandPredictionEngine
 import com.example.engine.PricingEngine
 import com.example.engine.RouteMatchingEngine
@@ -48,6 +50,10 @@ data class UiState(
     val isAuthenticated: Boolean = false,
     val isSigningIn: Boolean = false,
     val authErrorMessage: String? = null,
+    val authInfoMessage: String? = null,
+    val isPhoneCodeSent: Boolean = false,
+    val pendingEmailSignInLink: String? = null,
+    val savedEmailForSignInLink: String? = null,
     val isDarkMode: Boolean = false, // Clean modern booking app light mode by default, toggleable anytime
     val isNetworkSyncing: Boolean = false,
     val lastSyncTime: Long = System.currentTimeMillis(),
@@ -92,6 +98,7 @@ class ReturnRouteViewModel constructor(
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
     private val googleAuthManager by lazy { FirebaseGoogleAuthManager(application) }
+    private var phoneVerificationId: String? = null
 
     val currentUser = repository.currentUser
     val journeyOffers = repository.journeyOffers
@@ -150,6 +157,144 @@ class ReturnRouteViewModel constructor(
         }
     }
 
+    fun sendPhoneVerification(activityContext: Context, phoneNumber: String) {
+        if (_uiState.value.isSigningIn) return
+        val activity = activityContext as? Activity
+        if (activity == null) {
+            _uiState.update { it.copy(authErrorMessage = "Phone verification must be started from the app screen.") }
+            return
+        }
+        _uiState.update { it.copy(isSigningIn = true, authErrorMessage = null, authInfoMessage = null) }
+        try {
+            googleAuthManager.sendPhoneVerification(
+                activity = activity,
+                phoneNumber = phoneNumber,
+                onCodeSent = { verificationId ->
+                    phoneVerificationId = verificationId
+                    _uiState.update {
+                        it.copy(
+                            isSigningIn = false,
+                            isPhoneCodeSent = true,
+                            authInfoMessage = "Verification code sent by SMS. Standard message rates may apply."
+                        )
+                    }
+                },
+                onAutoVerified = { credential -> signInWithPhoneCredential(credential) },
+                onError = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isSigningIn = false,
+                            authErrorMessage = error.localizedMessage ?: "Could not send the SMS verification code."
+                        )
+                    }
+                }
+            )
+        } catch (error: Exception) {
+            _uiState.update {
+                it.copy(
+                    isSigningIn = false,
+                    authErrorMessage = error.localizedMessage ?: "Could not start phone verification."
+                )
+            }
+        }
+    }
+
+    fun verifyPhoneCode(code: String) {
+        val verificationId = phoneVerificationId
+        if (verificationId.isNullOrBlank()) {
+            _uiState.update { it.copy(authErrorMessage = "Request a new SMS code before verifying.") }
+            return
+        }
+        if (_uiState.value.isSigningIn) return
+        _uiState.update { it.copy(isSigningIn = true, authErrorMessage = null) }
+        viewModelScope.launch {
+            try {
+                completeFirebaseSignIn(googleAuthManager.signInWithPhoneCode(verificationId, code))
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        authErrorMessage = error.localizedMessage ?: "The SMS code is invalid or expired."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun signInWithPhoneCredential(credential: PhoneAuthCredential) {
+        if (_uiState.value.isSigningIn) return
+        _uiState.update { it.copy(isSigningIn = true, authErrorMessage = null) }
+        viewModelScope.launch {
+            try {
+                completeFirebaseSignIn(googleAuthManager.signInWithPhoneCredential(credential))
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        authErrorMessage = error.localizedMessage ?: "Phone verification failed."
+                    )
+                }
+            }
+        }
+    }
+
+    fun sendEmailSignInLink(email: String) {
+        if (_uiState.value.isSigningIn) return
+        _uiState.update { it.copy(isSigningIn = true, authErrorMessage = null, authInfoMessage = null) }
+        viewModelScope.launch {
+            try {
+                googleAuthManager.sendEmailSignInLink(email)
+                _uiState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        savedEmailForSignInLink = email.trim(),
+                        authInfoMessage = "Sign-in link sent. Open it on this device, then continue with the same email."
+                    )
+                }
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        authErrorMessage = error.localizedMessage ?: "Could not send the email sign-in link."
+                    )
+                }
+            }
+        }
+    }
+
+    fun receiveEmailSignInLink(link: String?) {
+        if (link.isNullOrBlank()) return
+        _uiState.update {
+            it.copy(
+                pendingEmailSignInLink = link,
+                savedEmailForSignInLink = googleAuthManager.pendingEmailForLink(),
+                authInfoMessage = "Email sign-in link received. Enter the same email address to continue."
+            )
+        }
+    }
+
+    fun completeEmailLinkSignIn(email: String) {
+        val link = _uiState.value.pendingEmailSignInLink
+        if (link.isNullOrBlank()) {
+            _uiState.update { it.copy(authErrorMessage = "Open the sign-in link from your email first.") }
+            return
+        }
+        if (_uiState.value.isSigningIn) return
+        _uiState.update { it.copy(isSigningIn = true, authErrorMessage = null) }
+        viewModelScope.launch {
+            try {
+                completeFirebaseSignIn(googleAuthManager.signInWithEmailLink(email, link))
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        authErrorMessage = error.localizedMessage ?: "Email-link sign-in failed."
+                    )
+                }
+            }
+        }
+    }
+
     fun signOut() {
         viewModelScope.launch {
             try {
@@ -162,6 +307,10 @@ class ReturnRouteViewModel constructor(
                     isAuthenticated = false,
                     isSigningIn = false,
                     authErrorMessage = null,
+                    authInfoMessage = null,
+                    isPhoneCodeSent = false,
+                    pendingEmailSignInLink = null,
+                    savedEmailForSignInLink = null,
                     currentScreen = ScreenDestination.LANDING,
                     showBookingDialog = false,
                     showCreateRideDialog = false,
@@ -235,6 +384,9 @@ class ReturnRouteViewModel constructor(
                 isAuthenticated = true,
                 isSigningIn = false,
                 authErrorMessage = null,
+                authInfoMessage = null,
+                isPhoneCodeSent = false,
+                pendingEmailSignInLink = null,
                 currentScreen = initialScreen
             )
         }

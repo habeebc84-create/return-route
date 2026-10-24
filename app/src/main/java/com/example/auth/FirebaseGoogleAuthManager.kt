@@ -1,5 +1,6 @@
 package com.example.auth
 
+import android.app.Activity
 import android.content.Context
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
@@ -10,11 +11,16 @@ import com.example.data.model.UserRole
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.ActionCodeSettings
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.PhoneAuthCredential
+import com.google.firebase.auth.PhoneAuthOptions
+import com.google.firebase.auth.PhoneAuthProvider
 import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -29,6 +35,7 @@ data class AuthenticatedAccount(
 class FirebaseGoogleAuthManager(context: Context) {
     private val appContext = context.applicationContext
     private val credentialManager = CredentialManager.create(appContext)
+    private val authState = appContext.getSharedPreferences("return_route_auth", Context.MODE_PRIVATE)
 
     suspend fun signIn(activityContext: Context): AuthenticatedAccount {
         val auth = firebaseAuthOrThrow()
@@ -61,6 +68,76 @@ class FirebaseGoogleAuthManager(context: Context) {
         val firebaseCredential = GoogleAuthProvider.getCredential(googleToken, null)
         val user = auth.signInWithCredential(firebaseCredential).awaitResult().user
             ?: throw IllegalStateException("Firebase sign-in completed without a user account.")
+        return user.toAuthenticatedAccount()
+    }
+
+    fun sendPhoneVerification(
+        activity: Activity,
+        phoneNumber: String,
+        onCodeSent: (verificationId: String) -> Unit,
+        onAutoVerified: (PhoneAuthCredential) -> Unit,
+        onError: (Exception) -> Unit
+    ) {
+        val auth = firebaseAuthOrThrow()
+        val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+            override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                onAutoVerified(credential)
+            }
+
+            override fun onVerificationFailed(error: com.google.firebase.FirebaseException) {
+                onError(error)
+            }
+
+            override fun onCodeSent(
+                verificationId: String,
+                token: PhoneAuthProvider.ForceResendingToken
+            ) {
+                onCodeSent(verificationId)
+            }
+        }
+        val options = PhoneAuthOptions.newBuilder(auth)
+            .setPhoneNumber(phoneNumber.trim())
+            .setTimeout(60L, TimeUnit.SECONDS)
+            .setActivity(activity)
+            .setCallbacks(callbacks)
+            .build()
+        PhoneAuthProvider.verifyPhoneNumber(options)
+    }
+
+    suspend fun signInWithPhoneCode(verificationId: String, code: String): AuthenticatedAccount {
+        val credential = PhoneAuthProvider.getCredential(verificationId, code.trim())
+        return signInWithPhoneCredential(credential)
+    }
+
+    suspend fun signInWithPhoneCredential(credential: PhoneAuthCredential): AuthenticatedAccount {
+        val user = firebaseAuthOrThrow().signInWithCredential(credential).awaitResult().user
+            ?: throw IllegalStateException("Phone verification completed without a user account.")
+        return user.toAuthenticatedAccount()
+    }
+
+    suspend fun sendEmailSignInLink(email: String) {
+        val auth = firebaseAuthOrThrow()
+        val projectId = FirebaseApp.getInstance().options.projectId
+            ?: throw IllegalStateException("The Firebase project ID is missing from google-services.json.")
+        val settings = ActionCodeSettings.newBuilder()
+            .setUrl("https://$projectId.firebaseapp.com/finishSignIn")
+            .setHandleCodeInApp(true)
+            .setAndroidPackageName(appContext.packageName, true, "1")
+            .build()
+        auth.sendSignInLinkToEmail(email.trim(), settings).awaitResult()
+        authState.edit().putString(KEY_PENDING_EMAIL, email.trim()).apply()
+    }
+
+    fun pendingEmailForLink(): String? = authState.getString(KEY_PENDING_EMAIL, null)
+
+    suspend fun signInWithEmailLink(email: String, link: String): AuthenticatedAccount {
+        val auth = firebaseAuthOrThrow()
+        if (!auth.isSignInWithEmailLink(link)) {
+            throw IllegalArgumentException("This link is not a valid ReturnRoute email sign-in link.")
+        }
+        val user = auth.signInWithEmailLink(email.trim(), link).awaitResult().user
+            ?: throw IllegalStateException("Email-link sign-in completed without a user account.")
+        authState.edit().remove(KEY_PENDING_EMAIL).apply()
         return user.toAuthenticatedAccount()
     }
 
@@ -108,6 +185,7 @@ class FirebaseGoogleAuthManager(context: Context) {
             uid = uid,
             displayName = displayName?.takeIf { it.isNotBlank() }
                 ?: email?.substringBefore('@')?.takeIf { it.isNotBlank() }
+                ?: phoneNumber?.takeIf { it.isNotBlank() }
                 ?: "Passenger",
             email = email.orEmpty(),
             emailVerified = isEmailVerified,
@@ -125,5 +203,9 @@ class FirebaseGoogleAuthManager(context: Context) {
         addOnCanceledListener {
             if (continuation.isActive) continuation.cancel()
         }
+    }
+
+    private companion object {
+        const val KEY_PENDING_EMAIL = "pending_email_link_email"
     }
 }

@@ -36,8 +36,11 @@ import com.example.ui.viewmodel.ScreenDestination
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private var incomingEmailSignInLink by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        incomingEmailSignInLink = intent?.dataString
         enableEdgeToEdge()
         setContent {
             val app = applicationContext as Application
@@ -45,11 +48,24 @@ class MainActivity : ComponentActivity() {
                 factory = ReturnRouteViewModel.provideFactory(app)
             )
             val uiState by viewModel.uiState.collectAsState()
+            val emailLink = incomingEmailSignInLink
+            LaunchedEffect(emailLink) {
+                if (!emailLink.isNullOrBlank()) {
+                    viewModel.receiveEmailSignInLink(emailLink)
+                    incomingEmailSignInLink = null
+                }
+            }
 
             ReturnRouteTheme(darkTheme = uiState.isDarkMode) {
                 ReturnRouteApp(viewModel = viewModel)
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        incomingEmailSignInLink = intent.dataString
     }
 }
 
@@ -61,9 +77,17 @@ fun ReturnRouteApp(
     val uiState by viewModel.uiState.collectAsState()
     if (!uiState.isAuthenticated) {
         LoginScreen(
-            onSignIn = viewModel::signInWithGoogle,
+            onGoogleSignIn = viewModel::signInWithGoogle,
+            onSendEmailLink = viewModel::sendEmailSignInLink,
+            onStartPhoneVerification = viewModel::sendPhoneVerification,
+            onVerifyPhoneCode = viewModel::verifyPhoneCode,
+            onCompleteEmailLink = viewModel::completeEmailLinkSignIn,
             isLoading = uiState.isSigningIn,
-            errorMessage = uiState.authErrorMessage
+            isPhoneCodeSent = uiState.isPhoneCodeSent,
+            hasIncomingEmailLink = uiState.pendingEmailSignInLink != null,
+            infoMessage = uiState.authInfoMessage,
+            errorMessage = uiState.authErrorMessage,
+            suggestedEmail = uiState.savedEmailForSignInLink
         )
         return
     }
