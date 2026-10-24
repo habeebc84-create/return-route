@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -155,7 +157,7 @@ fun RidesScreen(
                             Icon(Icons.Default.SearchOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(10.dp))
                             Text("No matching rides found", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                            Text("Try adjusting your search or load the bundled sample corridors.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Try another city or load the bundled sample corridors to explore available routes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(onClick = { viewModel.fetchLiveNetworkCorridors() }) {
                                 Text("Load Sample Corridors")
@@ -204,7 +206,14 @@ fun CreateRideDialog(
         onDismissRequest = onDismiss,
         title = { Text("Request Passenger Ride", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState())
+                    .imePadding(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = origin,
                     onValueChange = { origin = it },

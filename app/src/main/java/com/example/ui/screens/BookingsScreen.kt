@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,8 +18,6 @@ import com.example.data.model.Booking
 import com.example.data.model.BookingStatus
 import com.example.data.model.MatchType
 import com.example.ui.components.StatusBadge
-import com.example.ui.theme.ElectricCyan
-import com.example.ui.theme.PrimaryBlue
 import com.example.ui.theme.StatusSuccess
 import com.example.ui.viewmodel.ReturnRouteViewModel
 
@@ -50,16 +47,18 @@ fun BookingsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text(
-                text = "My Bookings & Trips",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "Track confirmed rides, parcel custody, and boarding verification PINs.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "My Bookings & Trips",
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Track confirmed rides, parcel custody, and boarding verification PINs.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         // Tabs
@@ -90,8 +89,15 @@ fun BookingsScreen(
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Box(modifier = Modifier.padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text("No bookings in this tab yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 28.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.ConfirmationNumber, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                            Text("No bookings in this tab yet", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Your trips will appear here when available.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
@@ -134,7 +140,7 @@ fun BookingItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = if (booking.requestType == MatchType.PASSENGER_RIDE) Icons.Default.DirectionsCar else Icons.Default.LocalShipping,
                         contentDescription = null,
@@ -148,6 +154,7 @@ fun BookingItemCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 StatusBadge(status = booking.status.label)
             }
 
@@ -156,7 +163,8 @@ fun BookingItemCard(
             Text(
                 text = "${booking.originSummary} → ${booking.destinationSummary}",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2
             )
             Text(
                 text = "Driver: ${booking.driverName} • ${booking.departureTime}",
@@ -173,11 +181,11 @@ fun BookingItemCard(
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Row(
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("BOARDING PIN", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             text = booking.verificationCode,
@@ -189,7 +197,7 @@ fun BookingItemCard(
                         )
                     }
 
-                    Column(horizontalAlignment = Alignment.End) {
+                    Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(start = 12.dp)) {
                         Text("Total Fare", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             text = "₹${booking.priceUsd.toInt()}",
@@ -257,7 +265,7 @@ fun ReviewDialog(
                         IconButton(onClick = { rating = star }) {
                             Icon(
                                 imageVector = if (star <= rating) Icons.Default.Star else Icons.Default.StarBorder,
-                                contentDescription = null,
+                                contentDescription = "$star ${if (star == 1) "star" else "stars"}${if (rating == star) ", selected" else ""}",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }

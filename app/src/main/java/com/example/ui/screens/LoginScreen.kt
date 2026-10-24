@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,10 +23,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -33,6 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.ui.components.ReturnRouteBrandHeader
@@ -64,6 +72,7 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -116,6 +125,7 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         label = { Text("Email address") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         enabled = !isLoading
                     )
                     Button(
@@ -154,17 +164,23 @@ fun LoginScreen(
                         onValueChange = { phoneNumber = it },
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         label = { Text("Phone number, including country code") },
-                        placeholder = { Text("+1 555 010 1234") },
+                        placeholder = { Text("+91 98765 43210") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         enabled = !isLoading && !isPhoneCodeSent
                     )
-                    if (isPhoneCodeSent) {
+                    AnimatedVisibility(
+                        visible = isPhoneCodeSent,
+                        enter = fadeIn(tween(160)) + expandVertically(tween(160)),
+                        exit = fadeOut(tween(120)) + shrinkVertically(tween(120))
+                    ) {
                         OutlinedTextField(
                             value = smsCode,
                             onValueChange = { smsCode = it.filter(Char::isDigit).take(6) },
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                             label = { Text("6-digit SMS code") },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             enabled = !isLoading
                         )
                         Button(
@@ -174,7 +190,8 @@ fun LoginScreen(
                         ) {
                             Text("Verify code and sign in")
                         }
-                    } else {
+                    }
+                    if (!isPhoneCodeSent) {
                         Button(
                             onClick = { onStartPhoneVerification(context, phoneNumber.trim()) },
                             enabled = !isLoading && phoneNumber.trim().length >= 8,

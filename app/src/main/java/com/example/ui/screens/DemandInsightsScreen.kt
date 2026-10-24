@@ -47,6 +47,34 @@ fun DemandInsightsScreen(
             )
         }
 
+        if (forecasts.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Insights,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Text("No demand forecasts available", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Corridor insights will appear here when forecast data is available.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
         items(forecasts) { forecast ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -63,7 +91,9 @@ fun DemandInsightsScreen(
                         Text(
                             text = forecast.corridorName,
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f).padding(end = 8.dp),
+                            maxLines = 2
                         )
                         Surface(
                             shape = RoundedCornerShape(8.dp),
@@ -93,7 +123,7 @@ fun DemandInsightsScreen(
                         color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Row(
-                            modifier = Modifier.padding(10.dp),
+                            modifier = Modifier.fillMaxWidth().padding(10.dp),
                             horizontalArrangement = Arrangement.SpaceAround
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {

@@ -1,6 +1,7 @@
 package com.example.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.*
@@ -27,11 +29,12 @@ import java.util.*
 
 @Composable
 fun StatusBadge(status: String, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
     val (bgColor, textColor) = when (status.uppercase()) {
-        "CONFIRMED", "COMPLETED", "ACTIVE" -> StatusGreenPill to StatusGreenText
-        "REQUESTED", "TODO", "IN_PROGRESS" -> StatusAmberPill to StatusAmberText
-        "CANCELLED", "REJECTED" -> Color(0xFFFEE2E2) to Color(0xFFB91C1C)
-        else -> StatusBluePill to StatusBlueText
+        "CONFIRMED", "COMPLETED", "ACTIVE" -> colors.secondaryContainer to colors.onSecondaryContainer
+        "REQUESTED", "TODO", "IN_PROGRESS" -> colors.tertiaryContainer to colors.onTertiaryContainer
+        "CANCELLED", "REJECTED" -> colors.errorContainer to colors.onErrorContainer
+        else -> colors.primaryContainer to colors.onPrimaryContainer
     }
 
     Surface(
@@ -151,12 +154,12 @@ fun MatchScoreCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = PrimaryBlue.copy(alpha = 0.15f)
+                            color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
                                 text = "${candidate.compatibilityScore}% MATCH",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
-                                color = PrimaryBlue,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
@@ -164,12 +167,12 @@ fun MatchScoreCard(
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = StatusGreenPill
+                                color = MaterialTheme.colorScheme.secondaryContainer
                             ) {
                                 Text(
                                     text = "-${offer.returnTripSavingsPercent}% RETURN SAVINGS",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
-                                    color = StatusGreenText,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                 )
                             }
@@ -181,12 +184,16 @@ fun MatchScoreCard(
                     Text(
                         text = "${offer.origin.city} → ${offer.destination.city}",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "Driver: ${offer.driverName} • ★ ${offer.driverRating} • ${offer.vehicleDescription}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -213,31 +220,27 @@ fun MatchScoreCard(
                 shape = RoundedCornerShape(10.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    horizontalArrangement = Arrangement.SpaceAround
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Departure", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(offer.departureTime.substringAfter("• "), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MatchMetric("Departure", offer.departureTime.substringAfter("• "), Modifier.weight(1f))
+                        MatchMetric("Route detour", "+${candidate.detourDistanceKm} km", Modifier.weight(1f))
                     }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Route Detour", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("+${candidate.detourDistanceKm} km", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Extra Time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("+${candidate.detourDurationMinutes} min", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Seats Avail", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("${offer.remainingSeats}", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MatchMetric("Extra time", "+${candidate.detourDurationMinutes} min", Modifier.weight(1f))
+                        MatchMetric("Seats available", "${offer.remainingSeats}", Modifier.weight(1f))
                     }
                 }
             }
 
             // Matching Engine Explainability reasons
-            AnimatedVisibility(visible = expanded) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(tween(160)) + expandVertically(tween(160)),
+                exit = fadeOut(tween(120)) + shrinkVertically(tween(120))
+            ) {
                 Column(modifier = Modifier.padding(top = 10.dp)) {
                     Text(
                         text = "Why this trip matched:",
@@ -297,5 +300,25 @@ fun MatchScoreCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MatchMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

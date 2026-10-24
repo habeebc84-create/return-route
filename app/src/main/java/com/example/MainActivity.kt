@@ -7,12 +7,17 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -123,7 +128,12 @@ fun ReturnRouteApp(
                 drawerContentColor = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.width(300.dp)
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp)
+                ) {
                     ReturnRouteBrandHeader()
                     Spacer(modifier = Modifier.height(18.dp))
 
@@ -214,7 +224,7 @@ fun ReturnRouteApp(
                         }
                     )
                     DrawerNavItem(
-                        icon = Icons.Default.AltRoute,
+                        icon = Icons.AutoMirrored.Filled.AltRoute,
                         title = "Driver Journeys",
                         visible = isRiderPortal || isAdmin,
                         selected = uiState.currentScreen == ScreenDestination.OFFERS,
@@ -293,6 +303,18 @@ fun ReturnRouteApp(
                             scope.launch { drawerState.close() }
                         }
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    DrawerNavItem(
+                        icon = Icons.AutoMirrored.Filled.Logout,
+                        title = "Sign out",
+                        selected = false,
+                        testTagValue = "sign_out_button",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            viewModel.signOut()
+                        }
+                    )
                 }
             }
         }
@@ -305,7 +327,11 @@ fun ReturnRouteApp(
             topBar = {
                 TopAppBar(
                     title = {
-                        ReturnRouteBrandHeader(showTagline = false)
+                        Text(
+                            text = "ReturnRoute",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            maxLines = 1
+                        )
                     },
                     navigationIcon = {
                         IconButton(
@@ -316,77 +342,14 @@ fun ReturnRouteApp(
                         }
                     },
                     actions = {
-                        // Live Network Fetch from Internet Button
-                        IconButton(
-                            onClick = { viewModel.fetchLiveNetworkCorridors() },
-                            modifier = Modifier.testTag("topbar_fetch_internet_button")
-                        ) {
-                            if (uiState.isNetworkSyncing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.CloudDownload,
-                                    contentDescription = "Load Sample Corridors",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-
-                        // Theme Mode Toggle (Light Booking App vs Midnight Dark)
                         IconButton(
                             onClick = { viewModel.toggleTheme() },
                             modifier = Modifier.testTag("theme_toggle_button")
                         ) {
                             Icon(
                                 imageVector = if (uiState.isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                contentDescription = "Toggle Theme",
+                                contentDescription = if (uiState.isDarkMode) "Switch to light theme" else "Switch to dark theme",
                                 tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        // Demo account sign-out control
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { viewModel.signOut() }
-                                .testTag("sign_out_button"),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                            border = CardDefaults.outlinedCardBorder()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(StatusSuccess)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Sign out",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Icon(Icons.Default.Logout, contentDescription = "Sign out", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
-                            }
-                        }
-
-                        // Map Shortcut Icon
-                        IconButton(
-                            onClick = { viewModel.navigateTo(ScreenDestination.INDIA_MAP) },
-                            modifier = Modifier.testTag("top_india_map_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Map,
-                                contentDescription = "India Map",
-                                tint = if (uiState.currentScreen == ScreenDestination.INDIA_MAP) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                         }
 
@@ -407,9 +370,9 @@ fun ReturnRouteApp(
                                     }
                                 }
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Notifications,
-                                    contentDescription = "Notifications",
+                                    Icon(
+                                        imageVector = Icons.Default.Notifications,
+                                    contentDescription = if (unreadNotifsCount > 0) "Notifications, $unreadNotifsCount unread" else "Notifications",
                                     tint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -469,7 +432,7 @@ fun ReturnRouteApp(
                     NavigationBarItem(
                         selected = uiState.currentScreen == ScreenDestination.OFFERS,
                         onClick = { viewModel.navigateTo(ScreenDestination.OFFERS) },
-                        icon = { Icon(Icons.Default.AltRoute, contentDescription = "Journeys") },
+                        icon = { Icon(Icons.AutoMirrored.Filled.AltRoute, contentDescription = "Journeys") },
                         label = { Text("Journeys") },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -500,7 +463,12 @@ fun ReturnRouteApp(
                     .padding(innerPadding)
                     .background(MaterialTheme.colorScheme.background)
             ) {
-                when (uiState.currentScreen) {
+                Crossfade(
+                    targetState = uiState.currentScreen,
+                    animationSpec = tween(durationMillis = 160),
+                    label = "screen_navigation"
+                ) { destination ->
+                when (destination) {
                     ScreenDestination.LANDING -> LandingScreen(viewModel = viewModel)
                     ScreenDestination.INDIA_MAP -> IndiaMapScreen(viewModel = viewModel)
                     ScreenDestination.RIDES -> RidesScreen(viewModel = viewModel)
@@ -514,6 +482,7 @@ fun ReturnRouteApp(
                     ScreenDestination.NOTIFICATIONS -> NotificationsScreen(viewModel = viewModel)
                     ScreenDestination.ADMIN -> AdminScreen(viewModel = viewModel)
                     ScreenDestination.SAFETY_LEGAL -> SafetyLegalScreen(viewModel = viewModel)
+                }
                 }
             }
         }
@@ -538,9 +507,13 @@ fun DrawerNavItem(
     selected: Boolean,
     badge: String? = null,
     visible: Boolean = true,
+    testTagValue: String? = null,
     onClick: () -> Unit
 ) {
     if (!visible) return
+    val itemModifier = Modifier.padding(vertical = 2.dp).let { modifier ->
+        if (testTagValue == null) modifier else modifier.testTag(testTagValue)
+    }
     NavigationDrawerItem(
         icon = { Icon(icon, contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
         label = {
@@ -576,7 +549,7 @@ fun DrawerNavItem(
             unselectedContainerColor = Color.Transparent
         ),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.padding(vertical = 2.dp)
+        modifier = itemModifier
     )
 }
 

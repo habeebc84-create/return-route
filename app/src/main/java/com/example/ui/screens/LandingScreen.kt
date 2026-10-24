@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -89,7 +90,8 @@ fun LandingScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
-                                .clickable { selectedServiceType = 0 },
+                                .clickable { selectedServiceType = 0 }
+                                .heightIn(min = 48.dp),
                             color = if (selectedServiceType == 0) MaterialTheme.colorScheme.surface else Color.Transparent,
                             shadowElevation = if (selectedServiceType == 0) 2.dp else 0.dp
                         ) {
@@ -118,7 +120,8 @@ fun LandingScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
-                                .clickable { selectedServiceType = 1 },
+                                .clickable { selectedServiceType = 1 }
+                                .heightIn(min = 48.dp),
                             color = if (selectedServiceType == 1) MaterialTheme.colorScheme.surface else Color.Transparent,
                             shadowElevation = if (selectedServiceType == 1) 2.dp else 0.dp
                         ) {
@@ -209,6 +212,7 @@ fun LandingScreen(
                             Surface(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
+                                    .heightIn(min = 48.dp)
                                     .clickable {
                                         searchOrigin = corridor.origin.city
                                         searchDestination = corridor.destination.city
@@ -218,7 +222,7 @@ fun LandingScreen(
                                 border = CardDefaults.outlinedCardBorder()
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
@@ -242,16 +246,16 @@ fun LandingScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     // Date Selector Chips
-                    Row(
+                    LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        listOf("Today", "Tomorrow", "This Weekend").forEach { dateOpt ->
+                        items(listOf("Today", "Tomorrow", "This Weekend")) { dateOpt ->
                             FilterChip(
                                 selected = selectedDateOption == dateOpt,
                                 onClick = { selectedDateOption = dateOpt },
-                                label = { Text(dateOpt, fontSize = 12.sp) },
+                                label = { Text(dateOpt, style = MaterialTheme.typography.labelLarge) },
                                 shape = RoundedCornerShape(8.dp)
                             )
                         }
@@ -447,7 +451,7 @@ fun LandingScreen(
                     QuickOptionCard(
                         title = "Post Journey",
                         subtitle = "Monetize your empty return",
-                        icon = Icons.Default.AltRoute,
+                        icon = Icons.AutoMirrored.Filled.AltRoute,
                         badge = "Drivers",
                         modifier = Modifier.weight(1f),
                         onClick = { viewModel.navigateTo(ScreenDestination.OFFERS) }

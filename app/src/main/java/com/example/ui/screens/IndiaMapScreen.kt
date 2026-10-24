@@ -7,6 +7,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -26,6 +28,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -141,6 +145,8 @@ fun IndiaMapScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 8.dp)
         ) {
             // Interactive Route Search Controls
             Surface(
@@ -164,7 +170,8 @@ fun IndiaMapScreen(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { showOriginSearch = true }
-                            .testTag("map_select_origin_btn"),
+                            .testTag("map_select_origin_btn")
+                            .semantics { contentDescription = "Select origin city, ${selectedOrigin.city}" },
                         color = MaterialTheme.colorScheme.surface,
                         border = CardDefaults.outlinedCardBorder()
                     ) {
@@ -188,7 +195,7 @@ fun IndiaMapScreen(
                             selectedOrigin = selectedDestination
                             selectedDestination = temp
                         },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(Icons.Default.SwapHoriz, contentDescription = "Swap", tint = MaterialTheme.colorScheme.primary)
                     }
@@ -199,7 +206,8 @@ fun IndiaMapScreen(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { showDestSearch = true }
-                            .testTag("map_select_dest_btn"),
+                            .testTag("map_select_dest_btn")
+                            .semantics { contentDescription = "Select destination city, ${selectedDestination.city}" },
                         color = MaterialTheme.colorScheme.surface,
                         border = CardDefaults.outlinedCardBorder()
                     ) {
@@ -221,8 +229,8 @@ fun IndiaMapScreen(
             // India Map Canvas Visualizer
             Box(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
+                    .heightIn(min = 220.dp, max = 420.dp)
                     .padding(horizontal = 16.dp, vertical = 4.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(if (uiState.isDarkMode) SurfaceDark else Color(0xFFF1F5F9))
@@ -305,7 +313,10 @@ fun IndiaMapScreen(
                                 Text(
                                     text = "${selectedOrigin.city} → ${selectedDestination.city}",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.widthIn(max = 210.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(

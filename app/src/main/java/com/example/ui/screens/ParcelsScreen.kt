@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -110,7 +112,7 @@ fun ParcelsScreen(
                             Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(10.dp))
                             Text("No parcel matches currently available", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                            Text("Load bundled sample corridors to see demo courier routes.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Sample courier routes will appear here when available.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(onClick = { viewModel.fetchLiveNetworkCorridors() }) {
                                 Text("Load Sample Couriers")
@@ -160,7 +162,14 @@ fun CreateParcelDialog(
         onDismissRequest = onDismiss,
         title = { Text("Send Parcel / Cargo", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState())
+                    .imePadding(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = pickup,
                     onValueChange = { pickup = it },

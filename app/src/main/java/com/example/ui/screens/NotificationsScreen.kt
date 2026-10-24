@@ -14,12 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.data.model.NotificationItem
-import com.example.ui.components.StatusBadge
 import com.example.ui.viewmodel.ReturnRouteViewModel
-import java.text.SimpleDateFormat
-import java.util.*
 
 @Composable
 fun NotificationsScreen(
@@ -41,10 +36,10 @@ fun NotificationsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "Notifications & Alerts",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
@@ -54,8 +49,11 @@ fun NotificationsScreen(
                     )
                 }
 
-                TextButton(onClick = { viewModel.markAllNotificationsRead() }) {
-                    Text("Mark all read", fontSize = 12.sp)
+                TextButton(
+                    onClick = { viewModel.markAllNotificationsRead() },
+                    enabled = notifications.any { !it.isRead }
+                ) {
+                    Text("Mark all read", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
@@ -67,8 +65,15 @@ fun NotificationsScreen(
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Box(modifier = Modifier.padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text("No notifications right now.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 28.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.NotificationsNone, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                            Text("You're all caught up", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                            Text("New trip and account updates will appear here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
@@ -77,7 +82,10 @@ fun NotificationsScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { viewModel.markNotificationRead(notif.id) },
+                        .heightIn(min = 72.dp)
+                        .clickable(
+                            onClickLabel = if (notif.isRead) "Notification already read" else "Mark notification as read"
+                        ) { viewModel.markNotificationRead(notif.id) },
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (notif.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
@@ -87,7 +95,7 @@ fun NotificationsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
+                            .padding(16.dp),
                         verticalAlignment = Alignment.Top
                     ) {
                         Icon(

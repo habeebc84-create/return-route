@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material3.Icon
@@ -212,7 +212,8 @@ fun InteractiveRouteMap(
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .fillMaxWidth(0.78f),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -225,7 +226,10 @@ fun InteractiveRouteMap(
             Text(
                 text = origin.city,
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.weight(1f, fill = false)
             )
             Text(
                 text = " → ",
@@ -242,7 +246,10 @@ fun InteractiveRouteMap(
             Text(
                 text = destination.city,
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.weight(1f, fill = false)
             )
         }
 
@@ -255,11 +262,12 @@ fun InteractiveRouteMap(
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
                     .border(1.dp, ElectricCyan.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .widthIn(max = 220.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.AltRoute,
+                    imageVector = Icons.AutoMirrored.Filled.AltRoute,
                     contentDescription = null,
                     tint = ElectricCyan,
                     modifier = Modifier.size(14.dp)
@@ -268,7 +276,8 @@ fun InteractiveRouteMap(
                 Text(
                     text = "+${detourKm}km corridor deviation",
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = ElectricCyan
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
                 )
             }
         }
