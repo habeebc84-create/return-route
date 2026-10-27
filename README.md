@@ -8,6 +8,16 @@ This repository builds three separately installable Android apps from shared cod
 
 Build with `:app:assemblePassengerDebug`, `:app:assembleRiderDebug`, and `:app:assembleAdminDebug`.
 
+## Download and install the Android apps
+
+Download the latest public debug-preview APK from the [GitHub Releases page](https://github.com/habeebc84-create/return-route/releases/latest):
+
+- [Passenger APK](https://github.com/habeebc84-create/return-route/releases/latest/download/ReturnRoute-Passenger-debug.apk)
+- [Rider APK](https://github.com/habeebc84-create/return-route/releases/latest/download/ReturnRoute-Rider-debug.apk)
+- [Admin APK](https://github.com/habeebc84-create/return-route/releases/latest/download/ReturnRoute-Admin-debug.apk)
+
+On Android, download the APK, open it from Downloads, and approve **Install unknown apps** for the browser or file manager if prompted. Install all three to use the separate apps side by side. These are **debug preview builds**, not production-store releases. If Android reports a signature conflict when replacing an older test build, uninstall that old build first. Firebase sign-in and Admin/Rider approval require the Firebase setup described below.
+
 ## Firebase Authentication and shared project
 
 1. Register all three Android application IDs in the **same Firebase project**.
