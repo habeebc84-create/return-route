@@ -1,23 +1,54 @@
 # ReturnRoute Android apps
 
-This project builds three separately installable Android apps from shared code:
+This repository builds three separately installable Android apps from shared code:
 
-- **Passenger** — application ID `com.aistudio.returnroute.rtapp`
-- **Rider/Driver** — application ID `com.aistudio.returnroute.rider`
-- **Admin** — application ID `com.aistudio.returnroute.admin`
+- **Passenger** — `com.aistudio.returnroute.rtapp`
+- **Rider/Driver** — `com.aistudio.returnroute.rider`
+- **Admin** — `com.aistudio.returnroute.admin`
 
-In Android Studio, select the `passenger`, `rider`, or `admin` build variant. From Gradle, build them with `:app:assemblePassengerDebug`, `:app:assembleRiderDebug`, and `:app:assembleAdminDebug`.
+Build with `:app:assemblePassengerDebug`, `:app:assembleRiderDebug`, and `:app:assembleAdminDebug`.
 
-## Firebase Google sign-in setup
+## Firebase Authentication and shared project
 
-1. In one Firebase project, register all three Android application IDs above.
-2. Under Firebase Authentication sign-in providers, enable **Google**, **Phone**, and **Email/Password**, then also enable **Email link (passwordless sign-in)**.
-3. Set the SMS region policy to allow the countries your service supports. Add the appropriate SHA-1 and SHA-256 signing-certificate fingerprints to each registered Android app. Phone Auth uses Play Integrity when available and may fall back to reCAPTCHA.
-4. Download the refreshed `google-services.json` containing all three app clients and place it at `app/google-services.json`.
-5. Google uses Credential Manager and Firebase Auth; phone sign-in sends an SMS verification code; email-link sign-in sends a Firebase Hosting link that returns to the installed app. Email-link Android app-link setup also requires the app package names and signing fingerprints in Firebase, plus the Firebase Hosting domain for the project. The Android app needs the generated `default_web_client_id`, so provider sign-in cannot be tested until Firebase is configured.
+1. Register all three Android application IDs in the **same Firebase project**.
+2. Enable Email/Password, Google, Phone, and Email link sign-in providers. Phone verification is SMS OTP and may have provider/carrier costs or quotas.
+3. Set the allowed SMS regions and add SHA-1/SHA-256 signing fingerprints for each app.
+4. Download a `google-services.json` that includes all three Android clients and place it at `app/google-services.json`.
+5. Enable Firebase App Check for all three app registrations. Release uses Play Integrity. Debug APKs use the Debug provider; register each debug token shown in Logcat in Firebase Console before using the access workflow.
 
-All three variants can use the same Firebase project and user directory. A new account without a server-issued role claim is treated as a Passenger. The Rider app accepts `role: "driver"` or `role: "delivery_provider"`; the Admin app accepts `role: "admin"` or `admin: true`. Assign or change those claims only from a trusted server using the Firebase Admin SDK—never from client-side app code.
+Firebase Email/Password uses an email address. Phone sign-in uses SMS OTP, not a password. A custom account-ID/password or phone/password flow needs a trusted backend and is not implemented as a client-side email lookup.
 
-## Important current limitation
+## Admin-controlled Rider access
 
-Google, SMS, and email-link sign-in establish accounts with Firebase, but the ride, parcel, offer, booking, and notification data is still held in the app's in-memory sample repository. Those records do **not** yet synchronize between the three apps or persist across devices. Firestore storage and restrictive Firestore Security Rules are a separate required step before the apps share operational data or handle real users.
+The Passenger app includes **Request Rider access**. The Admin app receives pending requests from Firestore and can grant or deny them. A grant is performed by a Firebase Callable Function with the Admin SDK; the Android client cannot write role claims. After approval, the user should sign out of Passenger, install/open Rider, and sign in again to receive the updated claim. Admin and Rider app access is still guarded by Firebase custom claims.
+
+### Deploy the secure access workflow
+
+Cloud Functions deployment requires a Firebase project with billing/Blaze enabled. This workflow is not a free-only Firebase feature. Firestore may have a no-cost quota, but functions deployment requires billing setup; monitor quotas and costs.
+
+```bash
+npm --prefix functions install
+npm --prefix functions run build
+firebase login
+firebase use --add
+firebase deploy --only firestore:rules,functions
+```
+
+Enable the **Play Integrity** App Check provider for each Android app in Firebase Console. For local debug builds, run each app once, copy its Firebase App Check debug token from Logcat, and register it under that app's App Check settings. Do not deploy with App Check enforcement disabled.
+
+### Bootstrap the first Admin safely
+
+An initial Admin custom claim must be granted from a trusted environment using Firebase Admin SDK credentials. Never put service-account credentials in the Android app or repository. With ADC or a securely managed service-account credential configured:
+
+```bash
+cd functions
+FIREBASE_PROJECT_ID=your-firebase-project npm run set-admin -- FIREBASE_AUTH_UID
+```
+
+Get the UID from Firebase Authentication. The Admin user must sign out and back in to refresh the token. Later Rider approvals are handled by the callable function, which checks `admin: true` or `role: "admin"` on the caller's verified ID token.
+
+## Important current limitations
+
+The Rider access request, Admin review, status listener, and role grant use Firebase Functions, Firestore, Authentication, and App Check. The Rider app also has a request-board screen, and its in-memory demo view exposes active passenger/parcel samples to an authorized Rider.
+
+However, **ride requests, parcel requests, offers, bookings, notifications, incident reports, and most dashboard metrics are still prototype-local/in-memory**. They do not yet persist or synchronize between separate app installs or devices. Do not use the current app as a production dispatch or booking service until these collections are moved to Firestore (or another authenticated backend), ownership/security rules and transaction-safe seat/cargo reservations are implemented, and end-to-end tests are run against the deployed Firebase project. The Admin dashboard labels this limitation rather than presenting hard-coded demo metrics as live data.

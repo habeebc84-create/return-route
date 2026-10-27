@@ -12,10 +12,13 @@ import com.example.data.local.task.TaskEntity
 import com.example.data.local.task.TaskRepository
 import com.example.data.model.*
 import com.example.data.repository.ReturnRouteRepository
+import com.example.data.repository.RiderAccessRepository
+import com.example.data.repository.RiderAccessRequest
 import com.example.auth.AuthenticatedAccount
 import com.example.auth.FirebaseGoogleAuthManager
 import com.example.BuildConfig
 import com.google.firebase.auth.PhoneAuthCredential
+import com.google.firebase.firestore.ListenerRegistration
 import com.example.engine.DemandPredictionEngine
 import com.example.engine.PricingEngine
 import com.example.engine.RouteMatchingEngine
@@ -30,6 +33,7 @@ enum class ScreenDestination(val title: String) {
     RIDES("Passenger Rides"),
     PARCELS("Parcel Deliveries"),
     OFFERS("Driver Journeys"),
+    RIDER_REQUESTS("Passenger & Parcel Requests"),
     MATCHING_ENGINE("Matching Engine"),
     BOOKINGS("My Bookings"),
     TASKS("Project Tasks"),
@@ -37,6 +41,7 @@ enum class ScreenDestination(val title: String) {
     DEMAND_INSIGHTS("Corridor Insights"),
     NOTIFICATIONS("Notifications"),
     ADMIN("Admin Dashboard"),
+    RIDER_ACCESS("Request Rider Access"),
     SAFETY_LEGAL("Safety & Legal")
 }
 
@@ -100,15 +105,30 @@ class ReturnRouteViewModel constructor(
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
     private val googleAuthManager by lazy { FirebaseGoogleAuthManager(application) }
+    private val riderAccessRepository by lazy { RiderAccessRepository() }
     private var phoneVerificationId: String? = null
+    private var pendingRequestsListener: ListenerRegistration? = null
+    private var userAccessStatusListener: ListenerRegistration? = null
+    private val _riderAccessRequests = MutableStateFlow<List<RiderAccessRequest>>(emptyList())
+    val riderAccessRequests: StateFlow<List<RiderAccessRequest>> = _riderAccessRequests.asStateFlow()
+    private val _riderAccessStatus = MutableStateFlow<String?>(null)
+    val riderAccessStatus: StateFlow<String?> = _riderAccessStatus.asStateFlow()
+    private val _riderAccessBusy = MutableStateFlow(false)
+    val riderAccessBusy: StateFlow<Boolean> = _riderAccessBusy.asStateFlow()
 
     val currentUser = repository.currentUser
     val journeyOffers = repository.journeyOffers
     val rideRequests = combine(repository.rideRequests, currentUser) { items, user ->
-        items.filter { it.passengerId == user.id }
+        when (user.activeRole) {
+            UserRole.DRIVER, UserRole.DELIVERY_PROVIDER, UserRole.ADMIN -> items.filter { it.status != JourneyStatus.CANCELLED }
+            else -> items.filter { it.passengerId == user.id }
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val parcelRequests = combine(repository.parcelRequests, currentUser) { items, user ->
-        items.filter { it.senderId == user.id }
+        when (user.activeRole) {
+            UserRole.DELIVERY_PROVIDER, UserRole.DRIVER, UserRole.ADMIN -> items.filter { it.status != JourneyStatus.CANCELLED }
+            else -> items.filter { it.senderId == user.id }
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val bookings = combine(repository.bookings, currentUser) { items, user ->
         items.filter { it.bookerId == user.id || it.driverId == user.id }
@@ -130,6 +150,32 @@ class ReturnRouteViewModel constructor(
     init {
         refreshMatches()
         restoreFirebaseSession()
+        viewModelScope.launch {
+            currentUser.collectLatest { user ->
+                pendingRequestsListener?.remove()
+                userAccessStatusListener?.remove()
+                _riderAccessRequests.value = emptyList()
+                _riderAccessStatus.value = null
+                if (user.id.startsWith("user_")) return@collectLatest
+                runCatching {
+                    when {
+                        user.activeRole == UserRole.ADMIN && BuildConfig.APP_ROLE == "admin" -> {
+                            pendingRequestsListener = riderAccessRepository.listenPendingRequests(
+                                onUpdate = { _riderAccessRequests.value = it },
+                                onError = { showSnackbar("Could not load Rider access requests. Check Firebase rules and connection.") }
+                            )
+                        }
+                        user.activeRole == UserRole.PASSENGER && BuildConfig.APP_ROLE == "passenger" -> {
+                            userAccessStatusListener = riderAccessRepository.listenUserRequestStatus(user.id) {
+                                _riderAccessStatus.value = it
+                            }
+                        }
+                    }
+                }.onFailure {
+                    showSnackbar("Rider access features need Firebase Firestore and deployed Functions.")
+                }
+            }
+        }
     }
 
     fun navigateTo(screen: ScreenDestination) {
@@ -138,6 +184,45 @@ class ReturnRouteViewModel constructor(
             return
         }
         _uiState.update { it.copy(currentScreen = screen) }
+    }
+
+    fun requestRiderAccess(note: String) {
+        if (BuildConfig.APP_ROLE != "passenger" || currentUser.value.activeRole != UserRole.PASSENGER) {
+            showSnackbar("Rider access can only be requested from a Passenger account.")
+            return
+        }
+        if (_riderAccessBusy.value) return
+        _riderAccessBusy.value = true
+        viewModelScope.launch {
+            try {
+                riderAccessRepository.requestRiderAccess(note)
+                _riderAccessStatus.value = "pending"
+                showSnackbar("Rider access request sent to the admin team.")
+            } catch (error: Exception) {
+                showSnackbar(error.localizedMessage ?: "Could not send the Rider access request.")
+            } finally {
+                _riderAccessBusy.value = false
+            }
+        }
+    }
+
+    fun reviewRiderAccess(uid: String, approved: Boolean) {
+        if (BuildConfig.APP_ROLE != "admin" || currentUser.value.activeRole != UserRole.ADMIN) {
+            showSnackbar("Only an authorized Admin can review Rider access.")
+            return
+        }
+        if (_riderAccessBusy.value) return
+        _riderAccessBusy.value = true
+        viewModelScope.launch {
+            try {
+                riderAccessRepository.reviewRequest(uid, approved)
+                showSnackbar(if (approved) "Rider access granted. The user must sign in again to refresh access." else "Rider access request denied.")
+            } catch (error: Exception) {
+                showSnackbar(error.localizedMessage ?: "Could not review the access request.")
+            } finally {
+                _riderAccessBusy.value = false
+            }
+        }
     }
 
     fun signInWithGoogle(activityContext: Context) {
@@ -154,6 +239,79 @@ class ReturnRouteViewModel constructor(
                         isSigningIn = false,
                         authErrorMessage = error.localizedMessage ?: "Google sign-in failed. Please try again."
                     )
+                }
+            }
+        }
+    }
+
+    fun signInWithEmailPassword(email: String, password: String) {
+        if (_uiState.value.isSigningIn) return
+        if (!email.trim().matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) || password.isBlank()) {
+            _uiState.update { it.copy(authErrorMessage = "Enter a valid email address and password.") }
+            return
+        }
+        _uiState.update { it.copy(isSigningIn = true, authErrorMessage = null, authInfoMessage = null) }
+        viewModelScope.launch {
+            try {
+                completeFirebaseSignIn(googleAuthManager.signInWithEmailPassword(email, password))
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        authErrorMessage = error.localizedMessage ?: "Email and password sign-in failed."
+                    )
+                }
+            }
+        }
+    }
+
+    fun createPassengerAccount(email: String, password: String) {
+        if (BuildConfig.APP_ROLE != "passenger") {
+            _uiState.update { it.copy(authErrorMessage = "New accounts can be created in the Passenger app. Rider and Admin access must be assigned by an administrator.") }
+            return
+        }
+        if (_uiState.value.isSigningIn) return
+        if (!email.trim().matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) || password.length < 6) {
+            _uiState.update { it.copy(authErrorMessage = "Enter a valid email and a password with at least 6 characters.") }
+            return
+        }
+        _uiState.update { it.copy(isSigningIn = true, authErrorMessage = null, authInfoMessage = null) }
+        viewModelScope.launch {
+            try {
+                googleAuthManager.createEmailPasswordAccount(email, password)
+                _uiState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        authInfoMessage = "Account created. Verify your email using the link we sent, then sign in."
+                    )
+                }
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        authErrorMessage = error.localizedMessage ?: "Could not create the account."
+                    )
+                }
+            }
+        }
+    }
+
+    fun sendPasswordResetEmail(email: String) {
+        if (_uiState.value.isSigningIn) return
+        if (!email.trim().matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) {
+            _uiState.update { it.copy(authErrorMessage = "Enter the account email address to reset its password.") }
+            return
+        }
+        _uiState.update { it.copy(isSigningIn = true, authErrorMessage = null, authInfoMessage = null) }
+        viewModelScope.launch {
+            try {
+                googleAuthManager.sendPasswordResetEmail(email)
+                _uiState.update {
+                    it.copy(isSigningIn = false, authInfoMessage = "If an account exists for that email, a password reset link has been sent.")
+                }
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(isSigningIn = false, authErrorMessage = error.localizedMessage ?: "Could not send a password reset link.")
                 }
             }
         }
@@ -411,8 +569,8 @@ class ReturnRouteViewModel constructor(
             ScreenDestination.NOTIFICATIONS,
             ScreenDestination.SAFETY_LEGAL
         )
-        val userScreens = common + setOf(ScreenDestination.RIDES, ScreenDestination.PARCELS)
-        val riderScreens = common + setOf(ScreenDestination.OFFERS, ScreenDestination.VEHICLES)
+        val userScreens = common + setOf(ScreenDestination.RIDES, ScreenDestination.PARCELS, ScreenDestination.RIDER_ACCESS)
+        val riderScreens = common + setOf(ScreenDestination.OFFERS, ScreenDestination.VEHICLES, ScreenDestination.RIDER_REQUESTS)
         return when (role) {
             UserRole.PASSENGER, UserRole.PARCEL_SENDER -> screen in userScreens
             UserRole.DRIVER, UserRole.DELIVERY_PROVIDER -> screen in riderScreens

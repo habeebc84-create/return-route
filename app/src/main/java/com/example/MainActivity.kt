@@ -83,6 +83,9 @@ fun ReturnRouteApp(
     if (!uiState.isAuthenticated) {
         LoginScreen(
             onGoogleSignIn = viewModel::signInWithGoogle,
+            onEmailPasswordSignIn = viewModel::signInWithEmailPassword,
+            onCreatePassengerAccount = viewModel::createPassengerAccount,
+            onPasswordReset = viewModel::sendPasswordResetEmail,
             onSendEmailLink = viewModel::sendEmailSignInLink,
             onStartPhoneVerification = viewModel::sendPhoneVerification,
             onVerifyPhoneCode = viewModel::verifyPhoneCode,
@@ -92,7 +95,8 @@ fun ReturnRouteApp(
             hasIncomingEmailLink = uiState.pendingEmailSignInLink != null,
             infoMessage = uiState.authInfoMessage,
             errorMessage = uiState.authErrorMessage,
-            suggestedEmail = uiState.savedEmailForSignInLink
+            suggestedEmail = uiState.savedEmailForSignInLink,
+            allowAccountCreation = BuildConfig.APP_ROLE == "passenger"
         )
         return
     }
@@ -234,6 +238,16 @@ fun ReturnRouteApp(
                         }
                     )
                     DrawerNavItem(
+                        icon = Icons.Default.Inbox,
+                        title = "Passenger & parcel requests",
+                        visible = isRiderPortal || isAdmin,
+                        selected = uiState.currentScreen == ScreenDestination.RIDER_REQUESTS,
+                        onClick = {
+                            viewModel.navigateTo(ScreenDestination.RIDER_REQUESTS)
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                    DrawerNavItem(
                         icon = Icons.Default.Tune,
                         title = "Route Matching Engine",
                         visible = isAdmin,
@@ -291,6 +305,16 @@ fun ReturnRouteApp(
                         selected = uiState.currentScreen == ScreenDestination.ADMIN,
                         onClick = {
                             viewModel.navigateTo(ScreenDestination.ADMIN)
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                    DrawerNavItem(
+                        icon = Icons.Default.PersonAddAlt1,
+                        title = "Request Rider access",
+                        visible = isUserPortal && BuildConfig.APP_ROLE == "passenger",
+                        selected = uiState.currentScreen == ScreenDestination.RIDER_ACCESS,
+                        onClick = {
+                            viewModel.navigateTo(ScreenDestination.RIDER_ACCESS)
                             scope.launch { drawerState.close() }
                         }
                     )
@@ -475,12 +499,14 @@ fun ReturnRouteApp(
                     ScreenDestination.PARCELS -> ParcelsScreen(viewModel = viewModel)
                     ScreenDestination.OFFERS -> OffersScreen(viewModel = viewModel)
                     ScreenDestination.MATCHING_ENGINE -> MatchingEngineScreen(viewModel = viewModel)
+                    ScreenDestination.RIDER_REQUESTS -> RiderRequestsScreen(viewModel = viewModel)
                     ScreenDestination.BOOKINGS -> BookingsScreen(viewModel = viewModel)
                     ScreenDestination.TASKS -> TasksScreen(viewModel = viewModel)
                     ScreenDestination.VEHICLES -> VehiclesScreen(viewModel = viewModel)
                     ScreenDestination.DEMAND_INSIGHTS -> DemandInsightsScreen(viewModel = viewModel)
                     ScreenDestination.NOTIFICATIONS -> NotificationsScreen(viewModel = viewModel)
                     ScreenDestination.ADMIN -> AdminScreen(viewModel = viewModel)
+                    ScreenDestination.RIDER_ACCESS -> RiderAccessScreen(viewModel = viewModel)
                     ScreenDestination.SAFETY_LEGAL -> SafetyLegalScreen(viewModel = viewModel)
                 }
                 }

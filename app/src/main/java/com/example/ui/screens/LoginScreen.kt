@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -40,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,9 @@ import com.example.ui.components.ReturnRouteBrandHeader
 @Composable
 fun LoginScreen(
     onGoogleSignIn: (Context) -> Unit,
+    onEmailPasswordSignIn: (String, String) -> Unit,
+    onCreatePassengerAccount: (String, String) -> Unit,
+    onPasswordReset: (String) -> Unit,
     onSendEmailLink: (String) -> Unit,
     onStartPhoneVerification: (Context, String) -> Unit,
     onVerifyPhoneCode: (String) -> Unit,
@@ -56,11 +61,13 @@ fun LoginScreen(
     isPhoneCodeSent: Boolean,
     hasIncomingEmailLink: Boolean,
     suggestedEmail: String?,
+    allowAccountCreation: Boolean,
     infoMessage: String?,
     errorMessage: String?
 ) {
     val context = LocalContext.current
     var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
     var phoneNumber by rememberSaveable { mutableStateOf("") }
     var smsCode by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(suggestedEmail) {
@@ -86,7 +93,7 @@ fun LoginScreen(
                 textAlign = TextAlign.Center
             )
             Text(
-                "Choose Google, an email sign-in link, or an SMS code.",
+                "Sign in with email and password, Google, an email link, or a phone SMS code.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -109,6 +116,63 @@ fun LoginScreen(
                 } else {
                     Icon(Icons.Default.AccountCircle, contentDescription = null)
                     Text("Continue with Google", modifier = Modifier.padding(start = 12.dp))
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                    Text("Email and password", fontWeight = FontWeight.SemiBold)
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        label = { Text("Email address") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        enabled = !isLoading
+                    )
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        label = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        enabled = !isLoading
+                    )
+                    Button(
+                        onClick = { onEmailPasswordSignIn(email.trim(), password) },
+                        enabled = !isLoading && email.contains('@') && password.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) {
+                        Text("Sign in with email")
+                    }
+                    if (allowAccountCreation) {
+                        Button(
+                            onClick = { onCreatePassengerAccount(email.trim(), password) },
+                            enabled = !isLoading && email.contains('@') && password.length >= 6,
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                        ) {
+                            Text("Create passenger account")
+                        }
+                    }
+                    TextButton(
+                        onClick = { onPasswordReset(email.trim()) },
+                        enabled = !isLoading && email.contains('@'),
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Forgot password?")
+                    }
+                    Text(
+                        "Email/password sign-in is free with Firebase Authentication. New accounts must verify their email.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -158,7 +222,13 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                    Text("SMS verification code", fontWeight = FontWeight.SemiBold)
+                    Text("Phone sign-in (SMS code)", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Firebase verifies phone numbers with a one-time SMS code, not a password. Carrier/message rates may apply.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                     OutlinedTextField(
                         value = phoneNumber,
                         onValueChange = { phoneNumber = it },
@@ -223,7 +293,7 @@ fun LoginScreen(
             }
             Spacer(Modifier.height(16.dp))
             Text(
-                "New accounts start as Passengers. Rider and Administrator access must be assigned by a trusted server. SMS rates may apply.",
+                "Rider and Administrator access must be assigned by a trusted server. A Firebase user ID is not a password-login username; username/ID login needs a trusted backend mapping.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

@@ -27,7 +27,8 @@ fun AdminScreen(
     modifier: Modifier = Modifier
 ) {
     val reports by viewModel.issueReports.collectAsState()
-    val users = viewModel.repository.sampleUsers
+    val accessRequests by viewModel.riderAccessRequests.collectAsState()
+    val accessActionBusy by viewModel.riderAccessBusy.collectAsState()
 
     LazyColumn(
         modifier = modifier
@@ -60,25 +61,30 @@ fun AdminScreen(
                 border = CardDefaults.outlinedCardBorder()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Platform Health & Corridor Metrics", fontWeight = FontWeight.Bold)
+                    Text("Platform status", fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Active Corridors", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("18", fontWeight = FontWeight.Black, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
+                            Text("Pending rider reviews", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${accessRequests.size}", fontWeight = FontWeight.Black, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
                         }
                         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("CO₂ Saved", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("1,420 kg", fontWeight = FontWeight.Black, fontSize = 20.sp, color = StatusSuccess)
+                            Text("Ride / parcel data", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Sample", fontWeight = FontWeight.Black, fontSize = 18.sp, color = MaterialTheme.colorScheme.tertiary)
                         }
                         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Avg Return Disc.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("28%", fontWeight = FontWeight.Black, fontSize = 20.sp, color = MaterialTheme.colorScheme.secondary)
+                            Text("Reports", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Local", fontWeight = FontWeight.Black, fontSize = 18.sp, color = MaterialTheme.colorScheme.secondary)
                         }
                     }
+                    Text(
+                        "Rider approvals sync through Firebase. Rides, parcels, bookings, and incident reports remain prototype-local and do not sync across installs yet.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -86,6 +92,53 @@ fun AdminScreen(
         // Issue Reports
         item {
             Text("Trust & Safety Incident Queue", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Rider access requests", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    "Approval assigns a server-side Firebase role. Verify identity, licence, insurance, and vehicle eligibility through your approved process before granting access.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        if (accessRequests.isEmpty()) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Text("No pending Rider access requests.", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        items(accessRequests, key = { "rider-access-${it.uid}" }) { request ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(request.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(request.email.ifBlank { "No email on account" }, style = MaterialTheme.typography.bodySmall)
+                    Text("Account ID: ${request.uid}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (request.note.isNotBlank()) Text("Applicant note: ${request.note}", style = MaterialTheme.typography.bodyMedium)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { viewModel.reviewRiderAccess(request.uid, true) },
+                            enabled = !accessActionBusy,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Grant Rider") }
+                        OutlinedButton(
+                            onClick = { viewModel.reviewRiderAccess(request.uid, false) },
+                            enabled = !accessActionBusy,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Deny") }
+                    }
+                }
+            }
         }
 
         if (reports.isEmpty()) {

@@ -1,0 +1,9 @@
+.gradle/
+**/build/
+app/google-services.json
+app/src/**/google-services.json
+functions/node_modules/
+functions/lib/
+functions/.env
+*.jks
+debug.keystore

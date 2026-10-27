@@ -71,6 +71,36 @@ class FirebaseGoogleAuthManager(context: Context) {
         return user.toAuthenticatedAccount()
     }
 
+    suspend fun signInWithEmailPassword(email: String, password: String): AuthenticatedAccount {
+        val auth = firebaseAuthOrThrow()
+        val user = auth
+            .signInWithEmailAndPassword(email.trim(), password)
+            .awaitResult()
+            .user ?: throw IllegalStateException("Email sign-in completed without a user account.")
+        if (!user.isEmailVerified) {
+            auth.signOut()
+            throw IllegalStateException("Verify your email address using the link we sent before signing in.")
+        }
+        return user.toAuthenticatedAccount()
+    }
+
+    suspend fun createEmailPasswordAccount(email: String, password: String) {
+        val auth = firebaseAuthOrThrow()
+        val user = auth
+            .createUserWithEmailAndPassword(email.trim(), password)
+            .awaitResult()
+            .user ?: throw IllegalStateException("Account creation completed without a user account.")
+        try {
+            user.sendEmailVerification().awaitResult()
+        } finally {
+            auth.signOut()
+        }
+    }
+
+    suspend fun sendPasswordResetEmail(email: String) {
+        firebaseAuthOrThrow().sendPasswordResetEmail(email.trim()).awaitResult()
+    }
+
     fun sendPhoneVerification(
         activity: Activity,
         phoneNumber: String,

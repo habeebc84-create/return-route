@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return signedIn() && (request.auth.token.admin == true || request.auth.token.role in ['admin', 'administrator']);
+    }
+
+    match /riderAccessRequests/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      // Request creation and review are callable-only; clients cannot assign roles or forge status.
+      allow create, update, delete: if false;
+    }
+
+    match /riderAccessAudit/{auditId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Deny access to all other data until explicit ownership/role rules are added.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
