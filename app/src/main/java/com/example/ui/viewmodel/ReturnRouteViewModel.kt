@@ -19,8 +19,10 @@ import com.google.firebase.auth.PhoneAuthCredential
 import com.example.engine.DemandPredictionEngine
 import com.example.engine.PricingEngine
 import com.example.engine.RouteMatchingEngine
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class ScreenDestination(val title: String) {
     LANDING("ReturnRoute"),
@@ -509,18 +511,26 @@ class ReturnRouteViewModel constructor(
             val userId = currentUser.value.id
             val firstRide = repository.rideRequests.value.firstOrNull { it.passengerId == userId }
             val firstParcel = repository.parcelRequests.value.firstOrNull { it.senderId == userId }
-
-            val rideCandidates = if (firstRide != null) {
-                repository.journeyOffers.value.map { offer ->
-                    RouteMatchingEngine.evaluateRideMatch(firstRide, offer)
-                }.sortedByDescending { it.compatibilityScore }
-            } else emptyList()
-
-            val parcelCandidates = if (firstParcel != null) {
-                repository.journeyOffers.value.map { offer ->
-                    RouteMatchingEngine.evaluateParcelMatch(firstParcel, offer)
-                }.sortedByDescending { it.compatibilityScore }
-            } else emptyList()
+            val offers = repository.journeyOffers.value
+            val (rideCandidates, parcelCandidates) = withContext(Dispatchers.Default) {
+                val rides = firstRide?.let { request ->
+                    offers.asSequence()
+                        .filter { it.status == JourneyStatus.SCHEDULED && it.acceptsPassengers }
+                        .map { RouteMatchingEngine.evaluateRideMatch(request, it) }
+                        .sortedByDescending { it.compatibilityScore }
+                        .take(50)
+                        .toList()
+                }.orEmpty()
+                val parcels = firstParcel?.let { request ->
+                    offers.asSequence()
+                        .filter { it.status == JourneyStatus.SCHEDULED && it.acceptsParcels }
+                        .map { RouteMatchingEngine.evaluateParcelMatch(request, it) }
+                        .sortedByDescending { it.compatibilityScore }
+                        .take(50)
+                        .toList()
+                }.orEmpty()
+                rides to parcels
+            }
 
             _uiState.update {
                 it.copy(
@@ -533,7 +543,15 @@ class ReturnRouteViewModel constructor(
     }
 
     fun requestBookingFromMatch(candidate: MatchCandidate, seats: Int, weightKg: Double) {
-        val newBooking = repository.createBooking(candidate, seats, weightKg)
+        try {
+            repository.createBooking(candidate, seats, weightKg)
+        } catch (error: IllegalArgumentException) {
+            showSnackbar(error.localizedMessage ?: "The booking details are invalid.")
+            return
+        } catch (error: IllegalStateException) {
+            showSnackbar(error.localizedMessage ?: "This journey is no longer available.")
+            return
+        }
         closeBookingDialog()
         showSnackbar("Booking request sent to ${candidate.journeyOffer.driverName}!")
         navigateTo(ScreenDestination.BOOKINGS)

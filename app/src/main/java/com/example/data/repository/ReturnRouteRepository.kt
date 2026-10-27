@@ -401,6 +401,7 @@ class ReturnRouteRepository {
         _parcelRequests.value = listOf(request) + _parcelRequests.value
     }
 
+    @Synchronized
     fun createBooking(
         offer: JourneyOffer,
         requestId: String,
@@ -409,21 +410,54 @@ class ReturnRouteRepository {
         weightKg: Double,
         priceUsd: Double
     ): Booking {
+        val currentOffer = _journeyOffers.value.firstOrNull { it.id == offer.id }
+            ?: throw IllegalStateException("This journey is no longer available. Refresh matches and try again.")
+        check(currentOffer.status == JourneyStatus.SCHEDULED) {
+            "This journey is no longer accepting bookings. Refresh matches and try again."
+        }
+        check(currentOffer.driverId != _currentUser.value.id) {
+            "You cannot book your own journey."
+        }
+        require(priceUsd.isFinite() && priceUsd >= 0.0) { "The booking price is invalid." }
+
+        val bookedSeats: Int
+        val bookedWeightKg: Double
+        when (type) {
+            MatchType.PASSENGER_RIDE -> {
+                check(currentOffer.acceptsPassengers) { "This journey is not accepting passengers." }
+                require(seats > 0) { "Select at least one seat." }
+                check(seats <= currentOffer.remainingSeats) {
+                    "Not enough seats remain. Refresh matches and choose a smaller seat count."
+                }
+                bookedSeats = seats
+                bookedWeightKg = 0.0
+            }
+            MatchType.PARCEL_DELIVERY -> {
+                check(currentOffer.acceptsParcels) { "This journey is not accepting parcels." }
+                require(weightKg.isFinite() && weightKg > 0.0) { "Parcel weight must be greater than zero." }
+                check(weightKg <= currentOffer.remainingParcelCapacityKg) {
+                    "Not enough parcel capacity remains. Refresh matches and try a smaller parcel."
+                }
+                bookedSeats = 0
+                bookedWeightKg = weightKg
+            }
+        }
+
         val verificationCode = (100000..999999).random().toString()
         val booking = Booking(
-            journeyOfferId = offer.id,
-            journeyDescription = "${offer.origin.city} → ${offer.destination.city}",
+            journeyOfferId = currentOffer.id,
+            journeyDescription = "${currentOffer.origin.city} → ${currentOffer.destination.city}",
             requestId = requestId,
             requestType = type,
             bookerId = _currentUser.value.id,
             bookerName = _currentUser.value.name,
-            driverId = offer.driverId,
-            driverName = offer.driverName,
-            seatsBooked = seats,
-            parcelWeightKg = weightKg,
-            originSummary = offer.origin.name,
-            destinationSummary = offer.destination.name,
-            departureTime = offer.departureTime,
+            driverId = currentOffer.driverId,
+            driverName = currentOffer.driverName,
+            seatsBooked = bookedSeats,
+            parcelWeightKg = bookedWeightKg,
+            originSummary = currentOffer.origin.name,
+            destinationSummary = currentOffer.destination.name,
+            departureTime = currentOffer.departureTime,
             priceUsd = priceUsd,
             status = BookingStatus.CONFIRMED,
             verificationCode = verificationCode
@@ -433,10 +467,10 @@ class ReturnRouteRepository {
 
         // Update offer available capacities
         _journeyOffers.value = _journeyOffers.value.map {
-            if (it.id == offer.id) {
+            if (it.id == currentOffer.id) {
                 it.copy(
-                    remainingSeats = (it.remainingSeats - seats).coerceAtLeast(0),
-                    remainingParcelCapacityKg = (it.remainingParcelCapacityKg - weightKg).coerceAtLeast(0.0)
+                    remainingSeats = currentOffer.remainingSeats - bookedSeats,
+                    remainingParcelCapacityKg = currentOffer.remainingParcelCapacityKg - bookedWeightKg
                 )
             } else it
         }
@@ -457,6 +491,7 @@ class ReturnRouteRepository {
         seats: Int,
         weightKg: Double
     ): Booking {
+        require(candidate.isEligible) { "This route does not meet the booking requirements." }
         return createBooking(
             offer = candidate.journeyOffer,
             requestId = candidate.requestId,
