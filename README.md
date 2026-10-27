@@ -8,6 +8,12 @@ This repository builds three separately installable Android apps from shared cod
 
 Build with `:app:assemblePassengerDebug`, `:app:assembleRiderDebug`, and `:app:assembleAdminDebug`.
 
+For a local source build, create the ignored debug signing key once if `debug.keystore` is missing from the project root (do not commit or use this debug key for production signing):
+
+```bash
+keytool -genkeypair -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+```
+
 ## Download and install the Android apps
 
 Download the latest public debug-preview APK from the [GitHub Releases page](https://github.com/habeebc84-create/return-route/releases/latest):
